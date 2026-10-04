@@ -8,6 +8,7 @@
 1. Script / interpreter functionality for composing walking sequences / motion primitives / moves
 1. Parametrize number of interpolation steps (have to be odd)
 1. Motionplanner 
-1. Get list of stored moves / primitives from controller (via UDP)
 1. Full hexapod step file generation (with input of servo step files)
 1. "X-march" / arc pattern (walk in a circle. Not rotation). Piece de resistance: Arc with spin ?
+1. Improve visualization
+1. Implement metachronal gait (for centipede type robots)
