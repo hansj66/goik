@@ -16,8 +16,10 @@ package simulator
 
 import (
 	"GOIK/robot"
+	"GOIK/script"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Commands for the phase based gait engine (robot/gaitEngine.go)
@@ -26,9 +28,6 @@ import (
 func (s *Shell) gaitEngine() (*robot.GaitEngine, error) {
 	if s.Pod.Engine != nil {
 		return s.Pod.Engine, nil
-	}
-	if s.Pod.IsWalking || s.Pod.IsReverting {
-		return nil, fmt.Errorf("the pod is running a stride. Use 'stop' and 'revert' first")
 	}
 
 	engine, err := robot.NewGaitEngine(s.Pod)
@@ -40,41 +39,69 @@ func (s *Shell) gaitEngine() (*robot.GaitEngine, error) {
 	return engine, nil
 }
 
-// leaveGaitEngine switches back to the table based gait (stride_vector / stride_angle)
-func (s *Shell) leaveGaitEngine() error {
-	if s.Pod.Engine == nil {
-		return nil
-	}
-	if !s.Pod.Engine.IsIdle() {
-		return fmt.Errorf("the gait engine is running. Use 'halt' and wait for the pod to settle first")
-	}
-	s.stopScript()
-	s.Pod.Engine = nil
-	return nil
-}
-
 func (s *Shell) executeWalkCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
-	if len(args) != 4 {
-		return fmt.Errorf("syntax error ('walk <x mm/s> <y mm/s> <yaw deg/s>'): %+v", args)
+	commands, err := script.Parse(strings.NewReader(strings.Join(args, " ")))
+	if err != nil {
+		return err
 	}
-
-	var values [3]float64
-	for i := range values {
-		v, err := strconv.ParseFloat(args[i+1], 64)
-		if err != nil {
-			return fmt.Errorf("syntax error ('walk <x mm/s> <y mm/s> <yaw deg/s>'): %+v", args)
-		}
-		values[i] = v
-	}
+	c := commands[0]
 
 	engine, err := s.gaitEngine()
 	if err != nil {
 		return err
 	}
 	s.stopScript()
-	engine.SetTwist(robot.Twist{X: values[0], Y: values[1], Yaw: values[2]})
+
+	// "walk ... for <s>" and "walk ... cycles <n>" run as a one line script, which halts at the end
+	if c.Duration > 0 || c.Cycles > 0 {
+		s.startScript("walk", commands, engine)
+		return nil
+	}
+	engine.SetTwist(robot.Twist{X: c.Values[0], Y: c.Values[1], Yaw: c.Values[2]})
+	return nil
+}
+
+// executePoseCmd handles pitch, roll, yaw, up, down, shift and level
+func (s *Shell) executePoseCmd(args []string) error {
+	s.outputCh <- fmt.Sprintf("%+v", args)
+
+	commands, err := script.Parse(strings.NewReader(strings.Join(args, " ")))
+	if err != nil {
+		return err
+	}
+
+	engine, err := s.gaitEngine()
+	if err != nil {
+		return err
+	}
+	if err := engine.SetBodyPose(script.PoseFor(&commands[0], engine.TargetBodyPose())); err != nil {
+		return err
+	}
+	s.outputCh <- fmt.Sprintf("Body pose: %s", engine.TargetBodyPose().String())
+	return nil
+}
+
+func (s *Shell) executeStepHeightCmd(args []string) error {
+	s.outputCh <- fmt.Sprintf("%+v", args)
+
+	if len(args) != 2 {
+		return fmt.Errorf("syntax error ('step_height <mm>'): %+v", args)
+	}
+	mm, err := strconv.ParseFloat(args[1], 64)
+	if err != nil {
+		return fmt.Errorf("syntax error ('step_height <mm>'): %+v", args)
+	}
+
+	engine, err := s.gaitEngine()
+	if err != nil {
+		return err
+	}
+	if err := engine.SetStepHeight(mm); err != nil {
+		return err
+	}
+	s.outputCh <- fmt.Sprintf("Max stride: %2.1f mm, reach: %2.1f mm", engine.MaxStride, engine.Reach)
 	return nil
 }
 
@@ -116,8 +143,10 @@ func (s *Shell) executeEngineCmd(args []string) error {
 		return fmt.Errorf("the gait engine is not running. Start it with 'walk'")
 	}
 
-	s.outputCh <- fmt.Sprintf("Velocity: %s, cycle time: %2.2f s, idle: %t, transitioning: %t",
-		engine.GetTwist().String(), engine.CycleTime(), engine.IsIdle(), engine.IsTransitioning())
+	s.outputCh <- fmt.Sprintf("Velocity: %s, stride: %2.1f mm, cycle time: %2.2f s, cycles: %2.1f, idle: %t, transitioning: %t",
+		engine.GetTwist().String(), engine.Stride(), engine.CycleTime(), engine.Cycles(), engine.IsIdle(), engine.IsTransitioning())
+	s.outputCh <- fmt.Sprintf("Body pose: %s (target %s, limited by reach: %t)",
+		engine.BodyPose().String(), engine.TargetBodyPose().String(), engine.PoseLimited)
 	s.outputCh <- fmt.Sprintf("Max stride: %2.1f mm, reach: %2.1f mm, IK errors: %d", engine.MaxStride, engine.Reach, engine.IKErrors)
 	if engine.LastError != nil {
 		s.outputCh <- fmt.Sprintf("Last error: %v", engine.LastError)

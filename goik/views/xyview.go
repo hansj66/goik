@@ -17,6 +17,7 @@ package views
 import (
 	"GOIK/robot"
 	"fmt"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -28,6 +29,8 @@ type XyView struct {
 	y            float32
 	size         float32
 	legendOffset float32
+	// Recent foot positions per leg
+	trails [][]robot.Coordinate
 }
 
 func NewXyView(x float32, y float32, size float32) *XyView {
@@ -42,46 +45,64 @@ func (v *XyView) TranslateY(y float64) int {
 	return int(v.y) + int(v.size)/2 - int(v.legendOffset) + int(y)
 }
 
-var effectorTargetUpdateThreshold = 20
-var effectorTargetUpdateTicker = 0
+// Number of positions kept per foot for the trail
+const TRAIL_LENGTH = 120
 
 func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 
 	DrawFrame(screen, "XY View ", v.size, v.x, v.y, v.legendOffset)
+	joints := p.GroundJoints()
+	n := p.BodyDefinition.NumLegs
+
+	// Neutral foot positions
+	for _, l := range p.Legs {
+		c := l.NeutralEffectorCoordinate
+		vector.StrokeCircle(screen, float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y)), 4, 1, NeutralClr(), true)
+	}
+
+	// Foot trails (ground frame)
+	v.updateTrails(joints)
+	for _, trail := range v.trails {
+		for _, c := range trail {
+			vector.DrawFilledCircle(screen, float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y)), 1, TrailClr(), false)
+		}
+	}
+
+	// Where swinging feet will land
+	if p.Engine != nil {
+		for l := range p.Legs {
+			if t, swinging := p.Engine.LandingTarget(l); swinging {
+				vector.StrokeCircle(screen, float32(v.TranslateX(t.X)), float32(v.TranslateY(t.Y)), 8, 2, Blue(), true)
+			}
+		}
+	}
 
 	// Draw body frame
-	for l := 0; l < p.BodyDefinition.NumLegs-1; l++ {
+	for l := 0; l < n; l++ {
+		next := (l + 1) % n
 		vector.StrokeLine(screen,
-			float32(v.TranslateX(p.Legs[l].Joints[0].X)),
-			float32(v.TranslateY(p.Legs[l].Joints[0].Y)),
-			float32(v.TranslateX(p.Legs[l+1].Joints[0].X)),
-			float32(v.TranslateY(p.Legs[l+1].Joints[0].Y)),
+			float32(v.TranslateX(joints[l][0].X)),
+			float32(v.TranslateY(joints[l][0].Y)),
+			float32(v.TranslateX(joints[next][0].X)),
+			float32(v.TranslateY(joints[next][0].Y)),
 			5,
 			White(),
 			true)
 	}
-	vector.StrokeLine(screen,
-		float32(v.TranslateX(p.Legs[p.BodyDefinition.NumLegs-1].Joints[0].X)),
-		float32(v.TranslateY(p.Legs[p.BodyDefinition.NumLegs-1].Joints[0].Y)),
-		float32(v.TranslateX(p.Legs[0].Joints[0].X)),
-		float32(v.TranslateY(p.Legs[0].Joints[0].Y)),
-		5,
-		White(),
-		true)
 
 	// Draw Coxa, Femur and Tibia
 	for j := 0; j < robot.NUM_JOINTS-1; j++ {
-		for l := 0; l < p.BodyDefinition.NumLegs; l++ {
+		for l := 0; l < n; l++ {
 			col := White()
 			width := 3
 			if p.IsSwingPhase(l) {
 				col = Blue()
 			}
 			vector.StrokeLine(screen,
-				float32(v.TranslateX(p.Legs[l].Joints[j].X)),
-				float32(v.TranslateY(p.Legs[l].Joints[j].Y)),
-				float32(v.TranslateX(p.Legs[l].Joints[j+1].X)),
-				float32(v.TranslateY(p.Legs[l].Joints[j+1].Y)),
+				float32(v.TranslateX(joints[l][j].X)),
+				float32(v.TranslateY(joints[l][j].Y)),
+				float32(v.TranslateX(joints[l][j+1].X)),
+				float32(v.TranslateY(joints[l][j+1].Y)),
 				float32(width),
 				col,
 				true)
@@ -89,38 +110,36 @@ func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 	}
 
 	// Draw joints
-	for _, l := range p.Legs {
-		for _, j := range l.Joints {
+	for _, l := range joints {
+		for _, j := range l {
 			vector.DrawFilledCircle(screen, float32(v.TranslateX(j.X)), float32(v.TranslateY(j.Y)), 5, Red(), true)
 		}
 	}
 
 	// Annotate legs with lex indexes
-	for l := 0; l < p.BodyDefinition.NumLegs; l++ {
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", l), v.TranslateX(p.Legs[l].Joints[3].X+15), v.TranslateY(p.Legs[l].Joints[3].Y+5))
+	for l := 0; l < n; l++ {
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", l), v.TranslateX(joints[l][3].X+15), v.TranslateY(joints[l][3].Y+5))
 	}
+}
 
-	// Draw IK effector targets
-	targetSize := 5
-	effectorTargetUpdateTicker++
-	if effectorTargetUpdateTicker > effectorTargetUpdateThreshold {
-		if effectorTargetUpdateTicker > 2*effectorTargetUpdateThreshold {
-			effectorTargetUpdateTicker = 0
-		}
-		targetSize = 10
+// updateTrails records the foot positions, skipping positions that haven't moved
+func (v *XyView) updateTrails(joints [][robot.NUM_JOINTS]robot.Coordinate) {
+	if len(v.trails) != len(joints) {
+		v.trails = make([][]robot.Coordinate, len(joints))
 	}
-	for i, l := range p.Legs {
-		t := l.EffectorTarget
-		vector.DrawFilledCircle(screen, float32(v.TranslateX(t.X)), float32(v.TranslateY(t.Y)), float32(targetSize), Blue(), true)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", i), v.TranslateX(t.X)+10, v.TranslateY(t.Y))
-	}
-
-	if p.HasDefinedStride {
-		for l := range p.Legs {
-			for i := range p.Legs[l].IntermediateEffectorCoordinates {
-				c := p.Legs[l].IntermediateEffectorCoordinates[i]
-				vector.DrawFilledCircle(screen, float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y)), float32(1), White(), false)
+	for l := range joints {
+		foot := joints[l][robot.EFFECTOR_ORIGIN_INDEX]
+		trail := v.trails[l]
+		if len(trail) > 0 {
+			last := trail[len(trail)-1]
+			if math.Hypot(foot.X-last.X, foot.Y-last.Y) < 0.5 {
+				continue
 			}
 		}
+		trail = append(trail, foot)
+		if len(trail) > TRAIL_LENGTH {
+			trail = trail[len(trail)-TRAIL_LENGTH:]
+		}
+		v.trails[l] = trail
 	}
 }

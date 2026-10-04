@@ -47,6 +47,14 @@ func StancePassiveClr() color.Color {
 	return color.RGBA{32, 32, 32, 1}
 }
 
+func TrailClr() color.Color {
+	return color.RGBA{110, 110, 110, 255}
+}
+
+func NeutralClr() color.Color {
+	return color.RGBA{90, 90, 90, 255}
+}
+
 func StanceActiveClr() color.Color {
 	return color.RGBA{64, 64, 64, 1}
 }

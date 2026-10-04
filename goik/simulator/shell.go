@@ -33,6 +33,8 @@ type Shell struct {
 	dispatchMap map[string]dispatchFunc
 	// Script is the running motion script (nil if none)
 	Script *script.Runner
+	// The engine the script was started on
+	scriptEngine *robot.GaitEngine
 	// mu protects Pod and Script. Commands run on the shell goroutine, while
 	// Ebiten updates and draws on its own goroutine
 	mu sync.Mutex
@@ -52,33 +54,28 @@ func NewShell(pod *robot.Pod) *Shell {
 		"set_coxa_angle":   s.executeSetCoxaAngleCmd,
 		"set_femur_angle":  s.executeSetFemurAngleCmd,
 		"set_tibia_angle":  s.executeSetTibiaAngleCmd,
-		"stride_vector":    s.executeStrideVectorCmd,
-		"stride_angle":     s.executeStrideAngleCmd,
-		"start":            s.executeStartCmd,
-		"stop":             s.executeStopCmd,
 		"reset":            s.executeResetCmd,
 		"speed":            s.executeSpeedCmd,
-		"zlift":            s.executeZLiftCmd,
 		"gait":             s.executeGaitCmd,
 		"save":             s.executeSaveCmd,
 		"load":             s.executeLoadCmd,
 		"zero":             s.executeZeroCmd,
-		"reverse":          s.executeReverseCmd,
-		"revert":           s.executeRevertCmd,
 		"record":           s.executeRecordCmd,
 		"export":           s.executeExportCmd,
 		"debug":            s.executeDebugCmd,
-		"step":             s.executeStepCycleCmd,
-		"pitch":            s.executePitchCmd,
-		"yaw":              s.executeYawCmd,
-		"roll":             s.executeRollCmd,
-		"up":               s.executeUpCmd,
-		"down":             s.executeDownCmd,
 		"ground":           s.executeGroundCmd,
 		"walk":             s.executeWalkCmd,
 		"halt":             s.executeHaltCmd,
 		"swing_time":       s.executeSwingTimeCmd,
 		"engine":           s.executeEngineCmd,
+		"step_height":      s.executeStepHeightCmd,
+		"pitch":            s.executePoseCmd,
+		"roll":             s.executePoseCmd,
+		"yaw":              s.executePoseCmd,
+		"up":               s.executePoseCmd,
+		"down":             s.executePoseCmd,
+		"shift":            s.executePoseCmd,
+		"level":            s.executePoseCmd,
 		"run":              s.executeRunCmd,
 		"abort":            s.executeAbortCmd,
 		"scripts":          s.executeScriptsCmd,

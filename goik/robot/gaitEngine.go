@@ -36,6 +36,8 @@ package robot
 		  This never triggers in a steady gait, but keeps the pod stable while gaits are blended.
 		- While a leg waits, its foot is still dragged along by the body. If a grounded foot gets close
 		  to the edge of the leg's reach, the body slows down (and stops if necessary) until it can step.
+		- The body can be rotated and moved relative to the feet (see bodyPose.go). The pose is ramped
+		  like the velocity, and limited to what all legs can reach.
 	Since the feet are only ever moved by small increments, there are no jumps when one motion is
 	chained to the next. With a zero velocity, the swing targets are the neutral positions, so the pod
 	walks itself back to the neutral stance and then goes idle.
@@ -52,6 +54,9 @@ const ENGINE_DT = 0.02
 
 // Feet closer than this (in mm) to their target are considered to be in place
 const SETTLE_TOLERANCE = 0.5
+
+// Minimum distance (mm) between the body (coxa joints) and the ground when posing the body
+const MIN_GROUND_CLEARANCE = 10.0
 
 // Fraction of a leg's reach used for the default maximum stride (leaves room for gait transitions)
 const STRIDE_REACH_MARGIN = 0.7
@@ -179,6 +184,11 @@ type GaitEngine struct {
 	StabilityMargin float64
 	// Radius (mm) around the neutral foot positions every leg can reach
 	Reach float64
+	// How fast the body pose changes (degrees/s and mm/s)
+	PoseRotationRate    float64
+	PoseTranslationRate float64
+	// True if the requested body pose was out of reach and the engine stopped short of it
+	PoseLimited bool
 
 	gait       *PhaseGait
 	dutyFactor float64
@@ -187,6 +197,16 @@ type GaitEngine struct {
 	current    Twist
 	idle       bool
 	speedScale float64
+	// Total number of gait cycles since the engine was created
+	cycles float64
+	// Twist applied to the body in the last tick (after stride and reach limits)
+	applied Twist
+	// Landing targets from the last tick
+	targets []Coordinate
+
+	pose         BodyPose
+	previousPose BodyPose
+	targetPose   BodyPose
 
 	// Number of IK failures since the engine was created. The leg keeps its last valid pose on failure
 	IKErrors  int
@@ -201,20 +221,23 @@ func NewGaitEngine(p *Pod) (*GaitEngine, error) {
 	}
 
 	e := &GaitEngine{
-		pod:                p,
-		Legs:               make([]EngineLeg, p.BodyDefinition.NumLegs),
-		SwingTime:          0.4,
-		StepHeight:         Z_LIFT,
-		LinearAcceleration: 100,
-		YawAcceleration:    60,
-		PhaseGain:          1.0,
-		MaxPhaseCorrection: 0.25,
-		DutyFactorRate:     0.25,
-		StabilityMargin:    10,
-		gait:               gait,
-		dutyFactor:         gait.DutyFactor,
-		idle:               true,
-		speedScale:         1,
+		pod:                 p,
+		Legs:                make([]EngineLeg, p.BodyDefinition.NumLegs),
+		targets:             make([]Coordinate, p.BodyDefinition.NumLegs),
+		SwingTime:           0.4,
+		StepHeight:          Z_LIFT,
+		LinearAcceleration:  100,
+		YawAcceleration:     60,
+		PhaseGain:           1.0,
+		MaxPhaseCorrection:  0.25,
+		DutyFactorRate:      0.25,
+		StabilityMargin:     10,
+		PoseRotationRate:    30,
+		PoseTranslationRate: 50,
+		gait:                gait,
+		dutyFactor:          gait.DutyFactor,
+		idle:                true,
+		speedScale:          1,
 	}
 
 	for i, l := range p.Legs {
@@ -310,7 +333,7 @@ func (e *GaitEngine) IsIdle() bool {
 
 // IsTransitioning returns true while the velocity or gait has not yet reached its target
 func (e *GaitEngine) IsTransitioning() bool {
-	if e.current != e.target || e.dutyFactor != e.gait.DutyFactor {
+	if e.current != e.target || e.dutyFactor != e.gait.DutyFactor || e.pose != e.targetPose {
 		return true
 	}
 	for i := range e.Legs {
@@ -333,26 +356,33 @@ func (e *GaitEngine) Tick(dt float64) {
 	// to keep the feet reachable, but that should not move the target of a foot that is about to land
 	commanded := e.limitStride(e.current)
 	twist := e.limitReach(commanded, dt)
+	posing := e.rampPose(dt)
 
 	if commanded.IsZero() && e.isSettled() {
-		e.idle = true
+		// Standing still. Only the body pose may be changing
+		e.applied = Twist{}
+		e.idle = !posing
+		if posing {
+			e.solveAll()
+		}
 		return
 	}
 	e.idle = false
+	e.applied = twist
 
 	cycles := dt / e.CycleTime()
+	e.cycles += cycles
 	e.clock = wrapPhase(e.clock + cycles)
 	e.dutyFactor = approach(e.dutyFactor, e.gait.DutyFactor, e.DutyFactorRate*cycles)
 	stanceTime := e.dutyFactor * e.CycleTime()
 
-	targets := make([]Coordinate, len(e.Legs))
 	for i := range e.Legs {
 		l := &e.Legs[i]
 		e.advancePhase(i, cycles)
-		targets[i] = e.landingTarget(i, commanded, stanceTime)
+		e.targets[i] = e.landingTarget(i, commanded, stanceTime)
 
 		if l.Swinging {
-			e.updateSwing(l, targets[i], dt)
+			e.updateSwing(l, e.targets[i], dt)
 		} else {
 			l.Foot = moveWithGround(l.Foot, twist, dt)
 		}
@@ -362,10 +392,26 @@ func (e *GaitEngine) Tick(dt float64) {
 	for i := range e.Legs {
 		l := &e.Legs[i]
 		if l.liftPending && !l.Swinging && e.canLift(i) {
-			e.liftOff(l, commanded, targets[i])
+			e.liftOff(l, commanded, e.targets[i])
 		}
-		e.solve(i)
 	}
+	e.solveAll()
+}
+
+// Cycles returns the number of gait cycles completed since the engine was created
+func (e *GaitEngine) Cycles() float64 {
+	return e.cycles
+}
+
+// LandingTarget returns where a swinging leg will land (ground reference frame).
+// The second return value is false if the leg is not swinging.
+func (e *GaitEngine) LandingTarget(legIndex int) (Coordinate, bool) {
+	return e.targets[legIndex], e.Legs[legIndex].Swinging
+}
+
+// Stride returns the longest distance (mm) a foot travels during a stance phase at the current velocity
+func (e *GaitEngine) Stride() float64 {
+	return e.strideLength(e.applied)
 }
 
 // advancePhase moves the leg's phase forward, running slightly faster or slower
@@ -387,10 +433,12 @@ func (e *GaitEngine) advancePhase(legIndex int, cycles float64) {
 
 // canLift returns true if the pod stays statically stable without the support of the leg
 func (e *GaitEngine) canLift(legIndex int) bool {
+	cog := e.centreOfGravity()
 	var feet []Coordinate
 	for i, l := range e.Legs {
 		if i != legIndex && !l.Swinging {
-			feet = append(feet, l.Foot)
+			// Relative to the centre of gravity, which moves when the body is shifted
+			feet = append(feet, NewCoordinate(l.Foot.X-cog.X, l.Foot.Y-cog.Y, l.Foot.Z))
 		}
 	}
 	return SupportMargin(feet) >= e.StabilityMargin
@@ -444,16 +492,57 @@ func (e *GaitEngine) updateSwing(l *EngineLeg, target Coordinate, dt float64) {
 		l.liftoff.Z+(target.Z-l.liftoff.Z)*w-e.StepHeight*math.Pow(math.Sin(math.Pi*s), 2))
 }
 
-// solve runs IK for the leg's commanded foot position. On failure the leg keeps its last valid pose.
-func (e *GaitEngine) solve(legIndex int) {
-	leg := e.pod.Legs[legIndex]
-	angles, err := SolveEffectorIK(leg, e.Legs[legIndex].Foot, e.pod.debugChannel)
-	if err != nil {
-		e.IKErrors++
-		e.LastError = fmt.Errorf("leg %d: %w", legIndex, err)
-		return
+// solveAll runs IK for all legs with the current body pose. If the pose has just changed and
+// puts a foot out of reach (or the body too close to the ground), the engine stays in the previous
+// pose and gives up on the target pose. A leg that still can't be solved keeps its last valid pose.
+func (e *GaitEngine) solveAll() {
+	angles, errs := e.solveLegs(e.pose)
+	if e.pose != e.previousPose && (hasError(errs) || !e.hasGroundClearance(e.pose)) {
+		e.pose = e.previousPose
+		e.targetPose = e.pose
+		e.PoseLimited = true
+		angles, errs = e.solveLegs(e.pose)
 	}
-	leg.RecalculateForwardKinematics(angles)
+
+	for i, leg := range e.pod.Legs {
+		if errs[i] != nil {
+			e.IKErrors++
+			e.LastError = fmt.Errorf("leg %d: %w", i, errs[i])
+			continue
+		}
+		leg.RecalculateForwardKinematics(angles[i])
+	}
+}
+
+// solveLegs solves IK for every foot, transformed into the body's reference frame
+func (e *GaitEngine) solveLegs(pose BodyPose) ([]ServoAngles, []error) {
+	angles := make([]ServoAngles, len(e.Legs))
+	errs := make([]error, len(e.Legs))
+	for i, leg := range e.pod.Legs {
+		angles[i], errs[i] = SolveEffectorIK(leg, pose.ToBody(e.Legs[i].Foot), e.pod.debugChannel)
+	}
+	return angles, errs
+}
+
+// hasGroundClearance returns true if all coxa joints (the corners of the body) stay at least
+// MIN_GROUND_CLEARANCE above the ground (the neutral foot height) with the given pose
+func (e *GaitEngine) hasGroundClearance(pose BodyPose) bool {
+	for _, leg := range e.pod.Legs {
+		coxa := pose.ToGround(leg.Joints[COXA_ORIGIN_INDEX])
+		if coxa.Z > leg.NeutralEffectorCoordinate.Z-MIN_GROUND_CLEARANCE {
+			return false
+		}
+	}
+	return true
+}
+
+func hasError(errs []error) bool {
+	for _, err := range errs {
+		if err != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // rampTwist moves the current velocity towards the target velocity within the acceleration limits
@@ -475,8 +564,8 @@ func (e *GaitEngine) rampTwist(dt float64) {
 	}
 }
 
-// limitStride scales the velocity down if any foot would travel further than MaxStride during a stance phase
-func (e *GaitEngine) limitStride(t Twist) Twist {
+// strideLength returns the longest distance (mm) a foot travels during a stance phase at velocity t
+func (e *GaitEngine) strideLength(t Twist) float64 {
 	stanceTime := e.dutyFactor * e.CycleTime()
 	yaw := t.Yaw * math.Pi / 180
 
@@ -487,7 +576,12 @@ func (e *GaitEngine) limitStride(t Twist) Twist {
 		stride := math.Hypot(t.X-yaw*n.Y, t.Y+yaw*n.X) * stanceTime
 		longest = math.Max(longest, stride)
 	}
+	return longest
+}
 
+// limitStride scales the velocity down if any foot would travel further than MaxStride during a stance phase
+func (e *GaitEngine) limitStride(t Twist) Twist {
+	longest := e.strideLength(t)
 	if longest <= e.MaxStride {
 		return t
 	}

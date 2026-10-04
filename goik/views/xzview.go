@@ -42,23 +42,24 @@ func (v *XzView) TranslateY(y float64) int {
 
 func (v *XzView) Render(screen *ebiten.Image, p *robot.Pod) {
 	DrawFrame(screen, "XZ View", v.size, v.x, v.y, v.legendOffset)
+	joints := p.GroundJoints()
 
 	// Draw body frame
 	for l := 0; l < p.BodyDefinition.NumLegs-1; l++ {
 		vector.StrokeLine(screen,
-			float32(v.TranslateX(p.Legs[l].Joints[0].X)),
-			float32(v.TranslateY(p.Legs[l].Joints[0].Z)),
-			float32(v.TranslateX(p.Legs[l+1].Joints[0].X)),
-			float32(v.TranslateY(p.Legs[l+1].Joints[0].Z)),
+			float32(v.TranslateX(joints[l][0].X)),
+			float32(v.TranslateY(joints[l][0].Z)),
+			float32(v.TranslateX(joints[l+1][0].X)),
+			float32(v.TranslateY(joints[l+1][0].Z)),
 			5,
 			White(),
 			true)
 	}
 	vector.StrokeLine(screen,
-		float32(v.TranslateX(p.Legs[p.BodyDefinition.NumLegs-1].Joints[0].X)),
-		float32(v.TranslateY(p.Legs[p.BodyDefinition.NumLegs-1].Joints[0].Z)),
-		float32(v.TranslateX(p.Legs[0].Joints[0].X)),
-		float32(v.TranslateY(p.Legs[0].Joints[0].Z)),
+		float32(v.TranslateX(joints[p.BodyDefinition.NumLegs-1][0].X)),
+		float32(v.TranslateY(joints[p.BodyDefinition.NumLegs-1][0].Z)),
+		float32(v.TranslateX(joints[0][0].X)),
+		float32(v.TranslateY(joints[0][0].Z)),
 		5,
 		White(),
 		true)
@@ -72,18 +73,18 @@ func (v *XzView) Render(screen *ebiten.Image, p *robot.Pod) {
 				col = Blue()
 			}
 			vector.StrokeLine(screen,
-				float32(v.TranslateX(p.Legs[l].Joints[j].X)),
-				float32(v.TranslateY(p.Legs[l].Joints[j].Z)),
-				float32(v.TranslateX(p.Legs[l].Joints[j+1].X)),
-				float32(v.TranslateY(p.Legs[l].Joints[j+1].Z)),
+				float32(v.TranslateX(joints[l][j].X)),
+				float32(v.TranslateY(joints[l][j].Z)),
+				float32(v.TranslateX(joints[l][j+1].X)),
+				float32(v.TranslateY(joints[l][j+1].Z)),
 				float32(width),
 				col,
 				true)
 		}
 	}
 
-	for _, l := range p.Legs {
-		for _, j := range l.Joints {
+	for _, l := range joints {
+		for _, j := range l {
 			vector.DrawFilledCircle(screen, float32(v.TranslateX(j.X)), float32(v.TranslateY(j.Z)), 5, Red(), true)
 		}
 	}

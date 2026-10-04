@@ -19,3 +19,14 @@ halt                       # step back into the neutral stance
 wait 1
 step_height 30             # lower steps
 walk 0 -60 0 for 3         # backwards
+
+halt
+pitch 10                   # raise the front of the body
+up 15                      # and stand taller
+wait 1
+walk 0 40 0 for 3          # walk with the body tilted
+roll -8                    # lean while walking
+walk 0 0 15 for 3
+halt
+level                      # body back to the neutral pose
+wait 1

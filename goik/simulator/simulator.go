@@ -26,7 +26,6 @@ import (
 
 const window_size = 1024
 
-
 type Game struct {
 	views views.RenderViews
 	Shell *Shell
@@ -97,7 +96,6 @@ func Run() {
 	shell := NewShell(pod)
 	go shell.Run()
 	g := NewGame(shell)
-
 
 	// Create main window and start the simulation
 	ebiten.SetWindowSize(window_size, window_size)

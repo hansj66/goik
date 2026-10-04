@@ -58,7 +58,7 @@ func (v *GaitView) RenderGait(screen *ebiten.Image, legend string, x_legend floa
 	ebitenutil.DebugPrintAt(screen, recordingMsg, int(v.x+v.legendOffset), int(y-12*v.legendOffset))
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Primitive steps: %d", p.MotionPrimitive.Size()/p.BodyDefinition.NumLegs), int(v.x+v.legendOffset), int(y-10*v.legendOffset))
 
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Cycle: %d", p.GetCurrentGaitCycle()), int(v.x+v.legendOffset), int(y-8*v.legendOffset))
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Cycle: %2.1f", p.GaitCycles()), int(v.x+v.legendOffset), int(y-8*v.legendOffset))
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Samples: %d", p.GetTick()), int(v.x+v.legendOffset), int(y-6*v.legendOffset))
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Sample size in bytes: %d", p.GetTick()*p.BodyDefinition.NumLegs*(robot.NUM_JOINTS-1)*2), int(v.x+v.legendOffset), int(y-4*v.legendOffset))
 

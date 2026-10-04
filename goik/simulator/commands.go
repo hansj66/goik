@@ -25,52 +25,6 @@ import (
 const POD_FOLDER = "pods"
 const PRIMITIVES_FOLDER = "primitives"
 
-func (s *Shell) executeHelpCmd(args []string) error {
-	s.outputCh <- "Commands:"
-	s.outputCh <- "\teffectors                                  - output current end effector positions."
-	s.outputCh <- "\tgait <tripod | ripple | wave>              - select new gait (blends smoothly when using walk)"
-	s.outputCh <- "\tset_coxa_length <ALL | legNum> <length>"
-	s.outputCh <- "\tset_femur_length <ALL | legNum> <length>"
-	s.outputCh <- "\tset_tibia_length <ALL | legNum> <length>"
-	s.outputCh <- "\tset_coxa_angle <ALL | legNum> <angle>"
-	s.outputCh <- "\tset_femur_angle <ALL | legNum> <angle>"
-	s.outputCh <- "\tset_tibia_angle <ALL | legNum> <angle>"
-	s.outputCh <- "\tground <height>                            - Grounds all end effectors and updates rest angles"
-	s.outputCh <- "\twalk <x> <y> <yaw>                         - Gait engine: walk with velocity x, y (mm/s) and yaw (deg/s)."
-	s.outputCh <- "\t                                             Can be changed at any time, transitions are smooth"
-	s.outputCh <- "\thalt                                       - Gait engine: slow down and step back to the neutral stance"
-	s.outputCh <- "\tswing_time <seconds>                       - Gait engine: duration of a leg swing (default 0.4)"
-	s.outputCh <- "\tengine                                     - Gait engine: show state"
-	s.outputCh <- "\trun <script>                               - Run a motion script from the scripts folder"
-	s.outputCh <- "\tabort                                      - Abort the running script and halt"
-	s.outputCh <- "\tscripts                                    - List scripts"
-	s.outputCh <- "\tservos                                     - Show the servo mapping (saved with 'save')"
-	s.outputCh <- "\tservo_model <AX-12A | STS3215 | XL-320>    - Select the servo type"
-	s.outputCh <- "\tservo <ALL | legNum> <coxa|femur|tibia> id <n> | invert <on|off> | offset <deg> | limits <min> <max>"
-	s.outputCh <- "\tstride_vector <nrepeats> <x> <y>           - Set direction. x & y are relative to current location"
-	s.outputCh <- "\tstride_angle <nrepeats> <degrees>          - Rotate around center of gravity"
-	s.outputCh <- "\tpitch <degrees>                            - Pitch move"
-	s.outputCh <- "\tyaw <degrees>                              - Yaw move"
-	s.outputCh <- "\troll <degrees>                             - Roll move"
-	s.outputCh <- "\tup <z>                                     - Stand tall"
-	s.outputCh <- "\tdown <z>                                   - Low rider"
-	s.outputCh <- "\tstart                                      - Start pod"
-	s.outputCh <- "\tstop                                       - Stop pod"
-	s.outputCh <- "\treset <0|1|2|3|4|5>                        - Reset to design preset <n>"
-	s.outputCh <- "\tspeed                                      - speed <1-10>"
-	s.outputCh <- "\tzlift                                      - defines leg lift during swing phase"
-	s.outputCh <- "\tsave <filename>                            - save pod definition to file"
-	s.outputCh <- "\tload <filename>                            - load pod definition from file"
-	s.outputCh <- "\tzero                                       - Aligns all servos to zero degrees"
-	s.outputCh <- "\treverse                                    - Reverses walking direction"
-	s.outputCh <- "\tstep                                       - Performs a single cycle through a gait pattern"
-	s.outputCh <- "\trevert                                     - Revert to a neutral position"
-	s.outputCh <- "\trecord <on|off>                            - Records next run or stops recording"
-	s.outputCh <- "\texport <file>                              - Save recording to a file, using the servo mapping"
-
-	return nil
-}
-
 func (s *Shell) executeEffectorsCmd(args []string) error {
 	s.outputCh <- "Current end effector positions:"
 
@@ -281,114 +235,14 @@ func (s *Shell) Dispatch(command string) error {
 	return execute(args)
 }
 
-func (s *Shell) executeStrideVectorCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 4 {
-		return fmt.Errorf("syntax error ('stride_vector <nrepeats> <X> <Y>'): %+v", args)
-	}
-
-	repeats, err := strconv.ParseInt(args[1], 10, 32)
-	if err != nil {
-		return fmt.Errorf("syntax error ('stride_vector <nrepeats> <X> <Y>'): %+v", args)
-	}
-
-	deltaX, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('stride_vector <nrepeats> <X> <Y>'): %+v", args)
-	}
-
-	deltaY, err := strconv.ParseFloat(args[3], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('stride_vector <nrepeats> <X> <Y>'): %+v", args)
-	}
-
-	// if s.Pod.IsWalking {
-	// 	return fmt.Errorf("live direction transitions aren't implemented yet. Please stop and reset before switching direction")
-	// }
-
-	if err := s.leaveGaitEngine(); err != nil {
-		return err
-	}
-
-	s.Pod.ResetInterpolator()
-
-	return s.Pod.SetStrideVector(int(repeats), deltaX, deltaY)
-}
-
-func (s *Shell) executeStrideAngleCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('stride_angle <nrepeats> <degrees>'): %+v", args)
-	}
-
-	repeats, err := strconv.ParseInt(args[1], 10, 32)
-	if err != nil {
-		return fmt.Errorf("syntax error ('stride_angle <nrepeats> <degrees>'): %+v", args)
-	}
-
-	degrees, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('stride_angle <nrepeats> <degrees>'): %+v", args)
-	}
-
-	// if s.Pod.IsWalking {
-	// 	return fmt.Errorf("live direction transitions aren't implemented yet. Please stop and reset before switching direction")
-	// }
-
-	if err := s.leaveGaitEngine(); err != nil {
-		return err
-	}
-
-	s.Pod.ResetInterpolator()
-
-	err = s.Pod.SetRotation(int(repeats), degrees)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Shell) executeStartCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 1 {
-		return fmt.Errorf("syntax error ('start'): %+v", args)
-	}
-
-	if !s.Pod.HasDefinedStride {
-		return fmt.Errorf("no defined stride")
-	}
-	err := s.Pod.Start()
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Shell) executeStopCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 1 {
-		return fmt.Errorf("syntax error ('stop'): %+v", args)
-	}
-
-	s.Pod.Stop()
-	return nil
-}
-
 func (s *Shell) executeResetCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
 	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('reset <1|2>'): %+v", args)
+		return fmt.Errorf("syntax error ('reset <0-5>'): %+v", args)
 	}
 
 	s.stopScript()
-	s.Pod.Stop()
 
 	if args[1] == "0" {
 		s.Pod = robot.NewPod(robot.NewExampleHexapod0())
@@ -429,23 +283,6 @@ func (s *Shell) executeSpeedCmd(args []string) error {
 	return nil
 }
 
-func (s *Shell) executeZLiftCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('zlift <0-90>'): %+v", args)
-	}
-
-	zlift, err := strconv.ParseFloat(args[1], 64)
-	if err != nil || zlift < 0 || zlift > 90 {
-		return fmt.Errorf("syntax error ('zlift <0-90>'): %+v", args)
-	}
-
-	robot.Z_LIFT = zlift
-
-	return nil
-}
-
 func (s *Shell) executeGaitCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
@@ -453,39 +290,25 @@ func (s *Shell) executeGaitCmd(args []string) error {
 		return fmt.Errorf("syntax error ('gait <tripod|ripple|wave>'): %+v", args)
 	}
 
-	if s.Pod.IsReverting {
-		return fmt.Errorf("the pod is reverting to the neutral stance. Try again when it has finished")
-	}
-
-	var gait *robot.Gait
-	var err error
-	switch args[1] {
-	case "tripod":
-		gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.TRIPOD)
-	case "ripple":
-		gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.RIPPLE)
-	case "wave":
-		gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.WAVE)
-	default:
-		return fmt.Errorf("syntax error ('gait <tripod|ripple|wave>'): %+v", args)
-	}
-	if err != nil {
-		return err
-	}
-
 	// The gait engine blends into the new gait while walking
 	if s.Pod.Engine != nil {
 		return s.Pod.Engine.SetGaitByName(args[1])
 	}
 
+	gaitType, err := robot.ParseGaitType(args[1])
+	if err != nil {
+		return err
+	}
+	gait, err := robot.NewGait(s.Pod.BodyDefinition.NumLegs, gaitType)
+	if err != nil {
+		return err
+	}
+	// Make sure the gait engine can use it once the pod starts walking
+	if _, err := robot.NewPhaseGait(gait, s.Pod.BodyDefinition.NumLegs); err != nil {
+		return err
+	}
 	s.Pod.BodyDefinition.Gait = gait
-	s.Pod.ResetInterpolator()
-	// s.Pod.RevertToNutral()
-	s.Pod.SetDebugChannel(s.outputCh)
-
-	s.Pod.Start()
-
-	return err
+	return nil
 }
 
 func (s *Shell) executeSaveCmd(args []string) error {
@@ -531,30 +354,6 @@ func (s *Shell) executeLoadCmd(args []string) error {
 func (s *Shell) executeZeroCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 	s.Pod.Zero()
-
-
-	return nil
-}
-
-func (s *Shell) executeReverseCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	s.Pod.ReverseDirection()
-	return nil
-}
-
-func (s *Shell) executeRevertCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	s.Pod.ResetInterpolator()
-	s.Pod.RevertToNutral()
-
-	// TODO: refactor
-	if s.Pod.IsRecording {
-		for _, l := range s.Pod.Legs {
-			s.Pod.MotionPrimitive.Add(l.ServoAngles)
-		}
-	}
 
 	return nil
 }
@@ -646,86 +445,6 @@ func (s *Shell) executeDebugCmd(args []string) error {
 	return nil
 }
 
-func (s *Shell) executeStepCycleCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if !s.Pod.HasDefinedStride {
-		return fmt.Errorf("no defined stride")
-	}
-
-	s.Pod.AddTargetGaitCycles(1)
-	return nil
-}
-
-func (s *Shell) executePitchCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	return fmt.Errorf("pitch command is not implemented yet")
-}
-
-func (s *Shell) executeYawCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	return fmt.Errorf("yaw command is not implemented yet")
-}
-
-func (s *Shell) executeRollCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	return fmt.Errorf("roll command is not implemented yet")
-}
-
-func (s *Shell) executeUpCmd(args []string) error {
-
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('up <z>'): %+v", args)
-	}
-
-	// z, err := strconv.ParseFloat(args[1], 64)
-	// if err != nil {
-	// 	return fmt.Errorf("syntax error ('stride_vector <nrepeats> <X> <Y>'): %+v", args)
-	// }
-
-	// s.Pod.ResetInterpolator()
-
-	// return s.Pod.SetHeight(1, z)
-
-	return fmt.Errorf("up command is not implemented yet")
-
-}
-
-func (s *Shell) executeDownCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('up <z>'): %+v", args)
-	}
-
-	z, err := strconv.ParseFloat(args[1], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('stride_vector <nrepeats> <X> <Y>'): %+v", args)
-	}
-
-	for _, l := range s.Pod.Legs {
-		l.Joints[0].Z = l.Joints[0].Z + z
-		l.Joints[1].Z = l.Joints[1].Z + z
-		l.NeutralEffectorCoordinate.Z = l.NeutralEffectorCoordinate.Z + z
-	}
-
-	s.Pod.Update()
-
-	// TODO: This is a bit "out of band"... Refactor all recording stuff
-	if s.Pod.IsRecording {
-		for _, l := range s.Pod.Legs {
-			s.Pod.MotionPrimitive.Add(l.ServoAngles)
-		}
-	}
-
-	return fmt.Errorf("down command is not implemented yet")
-}
-
 func (s *Shell) executeGroundCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
@@ -738,12 +457,5 @@ func (s *Shell) executeGroundCmd(args []string) error {
 		return fmt.Errorf("syntax error ('ground <height>'): %+v", args)
 	}
 
-	for _, l := range s.Pod.Legs {
-		err := l.Ground(height)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return s.Pod.Ground(height)
 }

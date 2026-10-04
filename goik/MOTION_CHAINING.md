@@ -4,27 +4,29 @@ Design notes for smooth transitions between motions (walk → turn → arc → c
 for running them on a robot controller ([Overlord](https://github.com/hansj66/overlord)) from a
 script, a gamepad or a remote device. The ESP32 is no longer a target for now.
 
-Status: implemented in Go and tested: the gait engine (part 1), motion scripts in the simulator and
-the servo mapping (part 2). Parts 3–4 are a proposal.
+Status: implemented in Go and tested: the gait engine with body pose (part 1), motion scripts in the
+simulator and the servo mapping (part 2). Parts 3–4 are a proposal.
 
-## Why the current approach can't chain
+## Why the old table based gait couldn't chain
 
-`Pod.SetStrideVector` / `SetRotation` precompute a table of 21 joint angle sets per leg for one
-stride, and `Update` plays them back with an index per leg. That gives three problems:
+The original gait (`stride_vector` / `stride_angle` / `start` / `stop` / `revert`, now removed)
+precomputed a table of 21 joint angle sets per leg for one stride, and played them back with an
+index per leg. That gave three problems:
 
-* **State is an index, not a position.** A new stride means new tables, and the indices then point to
-  different foot positions, so the feet jump. Bugs #3, #5, #10 and #15 in [BUGS.md](BUGS.md) are all
-  this problem.
-* **No notion of where a leg is in the gait.** All legs start at the middle of the table, so only
-  tripod gait starts cleanly.
+* **State is an index, not a position.** A new stride meant new tables, and the indices then pointed
+  to different foot positions, so the feet jumped. Bugs #3, #5, #10 and #15 in [BUGS.md](BUGS.md) were
+  all this problem.
+* **No notion of where a leg is in the gait.** All legs started at the middle of the table, so only
+  tripod gait started cleanly.
 * **Recordings are joint angles with no metadata.** Two recordings can only be chained if one happens
-  to end in the exact pose the other starts in.
+  to end in the exact pose the other starts in. (Still true for `export`, see part 2.)
 
 ## Part 1: phase based gait engine (implemented)
 
-[robot/gaitEngine.go](robot/gaitEngine.go) runs alongside the old code. In the simulator it is used
-by the `walk`, `halt`, `swing_time` and `engine` commands, and `gait` blends between gaits while it
-is active.
+[robot/gaitEngine.go](robot/gaitEngine.go) is the only way the pod moves. It is created when the pod
+first moves (`walk`, a pose command or `run`) and dropped when the pod's structure changes. In the
+simulator, `walk`, `halt`, `gait`, `swing_time`, `step_height`, the body pose commands and `engine`
+control it.
 
 The engine state is the **current foot position** of every leg plus a **phase** per leg. Commands
 only change rates, never positions, so there are no jumps when one motion follows another.
@@ -40,6 +42,8 @@ only change rates, never positions, so there are no jumps when one motion follow
 | Reach governor | While a leg waits, the body slows down (and stops if necessary) if a grounded foot gets close to the edge of its reach. Recovery is rate limited. |
 | Stopping | `halt` sets the velocity to 0. Swing targets become the neutral positions, so the pod steps back into its neutral stance (skipping legs that are already there) and goes idle. This fixes "stop leaves legs in the air". |
 | IK failure | The leg keeps its last valid pose and the error is counted, instead of snapping to 0/0/0. |
+| Body pose | Pitch, roll, yaw, X/Y shift and height of the body relative to the feet ([robot/bodyPose.go](robot/bodyPose.go)). The feet are kept in the ground frame and transformed into the body frame before IK. The pose is ramped (`PoseRotationRate`, `PoseTranslationRate`) and works while standing or walking. A pose that would put a foot out of reach, or a corner of the body within `MIN_GROUND_CLEARANCE` of the ground, is stopped at the last valid pose (`PoseLimited`). Shifting the body moves the centre of gravity used by the stability guard. |
+| Cycles | `Cycles()` counts completed gait cycles, so a walk can last a number of cycles (`walk ... cycles <n>`), like the old `stride_vector <n>` / `step`. `Stride()` reports the current stride length. |
 
 Tests ([robot/gaitEngine_test.go](robot/gaitEngine_test.go)) chain walk → turn → arc → wave →
 ripple (changing direction) → tripod (diagonal) → halt on three example hexapods and check:
@@ -58,27 +62,31 @@ ripple (changing direction) → tripod (diagonal) → halt on three example hexa
 >walk 0 80 0          # forward, 80 mm/s
 >walk 0 50 15         # arc
 >gait wave            # blends into wave gait (and slows down) while walking
+>pitch 10             # raise the front of the body while walking
 >walk 40 0 0          # sideways
 >gait tripod
 >halt                 # steps back into the neutral stance
->engine               # show phases, cycle time, IK errors
+>level                # body back to the neutral pose
+>walk 0 30 0 cycles 4 # walk 4 gait cycles, then halt
+>engine               # show phases, stride, cycle time, pose, IK errors
 ```
 
-`record on` / `export` still work while the engine is running. Idle ticks are not recorded.
+The XY view shows the feet's recent trails, the neutral foot positions (circles) and where swinging
+feet will land (blue rings). All views draw the pod in the ground frame, so the body pose is visible.
+
+`record on` / `export` work while the engine is running. Idle ticks are not recorded.
 
 ### Known limitations / next steps for the engine
 
 * The swing starts and ends with zero velocity relative to the body, while stance feet move at the
   body speed. A Hermite swing that matches the stance velocity at liftoff and touchdown would remove
   the remaining velocity step (about 3 mm/tick at 50 Hz).
-* The centre of gravity is assumed to be at the body origin. A body pose (roadmap item 3:
-  pitch/roll/yaw/shift) is a transform applied to the feet before IK and fits in naturally. It
-  should also move the centre of gravity used by the stability guard.
-* Phase offsets for 7 and 8 legs (heptapod wave, spider) are missing because `NewGait` has no
-  tables for them. They are easier to generate from the leg angles than to write as tables.
-* The table based engine should eventually be removed. Shell commands and Ebiten's update run on
-  different goroutines without a lock (bug #20). That has to be fixed before the shell gets more
-  ways to change state.
+* The centre of gravity is assumed to be at the body origin. Shifting the body moves it, but tilting
+  the body doesn't move its projection yet (that needs the height of the centre of gravity).
+* The velocity is in the ground frame of the stance, not in the (yawed) body frame. With a yaw pose,
+  `walk 0 50 0` still walks along the stance's Y axis.
+* There is no gait table for 8 legs (the spider uses the hexapod tripod table, which happens to have
+  8 rows). Gaits are easier to generate from the leg angles than to write as tables.
 
 ## Part 2: what a "motion primitive" becomes
 
@@ -106,11 +114,18 @@ are shown at the bottom of the window. See [scripts/demo.goik](scripts/demo.goik
 
 ```
 gait <tripod|ripple|wave>          blend into a new gait
-walk <x> <y> <yaw> [for <seconds>] set the body velocity (mm/s, mm/s, degrees/s)
+walk <x> <y> <yaw> [for <seconds> | cycles <n>]
+                                   set the body velocity (mm/s, mm/s, degrees/s), optionally for a
+                                   while or a number of gait cycles
 wait <seconds>                     keep the current motion for a while
-halt                               stop and wait until the pod has settled in its neutral stance
+halt                               stop and wait until the pod (legs and body) has settled
 swing_time <seconds>               duration of a leg swing
 step_height <mm>                   height of the swing arc
+pitch | roll | yaw <degrees>       rotate the body (positive pitch raises the front, positive roll
+                                   lowers the +X side, positive yaw turns from +X towards +Y)
+up | down <mm>                     raise or lower the body relative to the neutral stance
+shift <x> <y>                      move the body (and its centre of gravity)
+level                              return the body to the neutral pose
 repeat [count]                     run the block since the previous repeat (or the start of the
                                    script) count times in total. Without a count: forever
 ```
@@ -118,7 +133,10 @@ repeat [count]                     run the block since the previous repeat (or t
 * Scripts run in **robot time** (the engine's 20 ms step), so they look the same at any `speed`.
 * The whole file is checked before anything runs, and errors include line numbers.
 * The pod always halts at the end of a script. A `repeat` loop that never waits is detected.
-* Not yet: `play <clip>` (needs the clip format), nested loops, and body pose commands.
+* Body pose commands set a target that the body moves towards while the script continues. Use
+  `wait` to let it get there.
+* In the shell, `walk ... for <s>` and `walk ... cycles <n>` run as one-line scripts (and halt at the end).
+* Not yet: `play <clip>` (needs the clip format) and nested loops.
 
 ### Servo mapping (implemented)
 
@@ -198,12 +216,14 @@ Also tracked as #44–#47 in [BUGS.md](BUGS.md).
 2. ~~Shell/update locking (#20), network controller pod pointer (#21), clamping (#32), checksum (#33)~~ (done)
 3. ~~Servo mapping in the pod definition~~ (done)
 4. ~~Motion scripts in the simulator~~ (done)
-5. `dynamixel` package for protocol 1.0 (AX-12A, STS3215): Ping, Read, Write, Sync Write, DIR
+5. ~~Remove the table based gait (`stride_vector`, `start`, `stop`, `revert` ...); body pose~~ (done)
+6. `dynamixel` package for protocol 1.0 (AX-12A, STS3215): Ping, Read, Write, Sync Write, DIR
    handling with `tcdrain`, plus a `ServoBus` interface with a fake
-6. `cmd/overlord`: control loop + gamepad. First milestone: walking with the gamepad. Then running
+7. `cmd/overlord`: control loop + gamepad. First milestone: walking with the gamepad. Then running
    scripts from disk and UDP text commands (sharing the script parser)
-7. Clip format v2 with the neutral start/end contract, and `play <clip>` in scripts
-8. Telemetry, so the simulator can show the real robot. IMU levelling
+8. Clip format v2 with the neutral start/end contract, and `play <clip>` in scripts
+9. Telemetry, so the simulator can show the real robot. IMU levelling (the body pose makes this a
+   matter of feeding pitch/roll corrections back into `SetBodyPose`)
 
 ## Open decisions
 

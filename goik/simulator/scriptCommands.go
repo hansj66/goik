@@ -34,6 +34,12 @@ func (s *Shell) tickScript() {
 	if s.Script == nil || s.Script.Done() {
 		return
 	}
+	// The engine is dropped when the pod changes (reset, load, geometry changes, zero, ground)
+	if s.Pod.Engine != s.scriptEngine {
+		s.Script.Stop()
+		s.outputCh <- fmt.Sprintf("Script %s stopped: the pod was changed", s.Script.Name)
+		return
+	}
 	if err := s.Script.Tick(robot.ENGINE_DT); err != nil {
 		s.outputCh <- fmt.Sprintf("Script stopped: %v", err)
 		return
@@ -70,9 +76,15 @@ func (s *Shell) executeRunCmd(args []string) error {
 	}
 
 	s.stopScript()
-	s.Script = script.NewRunner(name, commands, engine, func(msg string) { s.outputCh <- msg })
+	s.startScript(name, commands, engine)
 	s.outputCh <- fmt.Sprintf("Running %s (%d commands)", name, len(commands))
 	return nil
+}
+
+// startScript starts running commands on the engine
+func (s *Shell) startScript(name string, commands []script.Command, engine *robot.GaitEngine) {
+	s.Script = script.NewRunner(name, commands, engine, func(msg string) { s.outputCh <- msg })
+	s.scriptEngine = engine
 }
 
 func (s *Shell) executeAbortCmd(args []string) error {

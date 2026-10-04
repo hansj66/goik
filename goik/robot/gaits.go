@@ -41,10 +41,9 @@ const (
 type GaitPattern [][]int
 
 type Gait struct {
-	Pattern                 *GaitPattern
-	StanceReturnSpeedFactor float64
-	Name                    string
-	NumIndicesInPattern     int
+	Pattern             *GaitPattern
+	Name                string
+	NumIndicesInPattern int
 }
 
 func NewHeptapodGait(GaitType GaitType) (*Gait, error) {
@@ -62,10 +61,9 @@ func NewHeptapodGait(GaitType GaitType) (*Gait, error) {
 		{0, 0, 0, 0, 0, 1, 0},
 		{0, 0, 0, 0, 0, 0, 1}})
 	return &Gait{
-		Pattern:                 &p,
-		StanceReturnSpeedFactor: 0.16,
-		Name:                    "Wave gait",
-		NumIndicesInPattern:     7,
+		Pattern:             &p,
+		Name:                "Wave gait",
+		NumIndicesInPattern: 7,
 	}, nil
 
 }
@@ -84,10 +82,9 @@ func NewPentapodGait(GaitType GaitType) (*Gait, error) {
 		{0, 0, 0, 1, 0},
 		{0, 0, 0, 0, 1}})
 	return &Gait{
-		Pattern:                 &p,
-		StanceReturnSpeedFactor: 0.2,
-		Name:                    "Wave gait",
-		NumIndicesInPattern:     5,
+		Pattern:             &p,
+		Name:                "Wave gait",
+		NumIndicesInPattern: 5,
 	}, nil
 }
 
@@ -103,10 +100,9 @@ func NewHexapodGait(GaitType GaitType) (*Gait, error) {
 			{0, 0, 0, 1, 0, 0}})
 
 		return &Gait{
-			Pattern:                 &p,
-			StanceReturnSpeedFactor: 0.19, // Yeah, there is a rounding error somewhere. Sue me.
-			Name:                    "Wave gait",
-			NumIndicesInPattern:     6,
+			Pattern:             &p,
+			Name:                "Wave gait",
+			NumIndicesInPattern: 6,
 		}, nil
 	} else if GaitType == RIPPLE {
 		copy(p, [][]int{{0, 0, 1, 0, 0, 1}, // 1 == swing phase, 0 == stance phase
@@ -117,10 +113,9 @@ func NewHexapodGait(GaitType GaitType) (*Gait, error) {
 			{0, 1, 0}})
 
 		return &Gait{
-			Pattern:                 &p,
-			StanceReturnSpeedFactor: 0.4,
-			Name:                    "Ripple gait",
-			NumIndicesInPattern:     3,
+			Pattern:             &p,
+			Name:                "Ripple gait",
+			NumIndicesInPattern: 3,
 		}, nil
 	}
 
@@ -135,10 +130,9 @@ func NewHexapodGait(GaitType GaitType) (*Gait, error) {
 		{0, 1},
 		{1, 0}})
 	return &Gait{
-		Pattern:                 &p,
-		StanceReturnSpeedFactor: 1,
-		Name:                    "Tripod gait",
-		NumIndicesInPattern:     2,
+		Pattern:             &p,
+		Name:                "Tripod gait",
+		NumIndicesInPattern: 2,
 	}, nil
 }
 
@@ -162,6 +156,8 @@ func NewGait(NumLegs int, GaitType GaitType) (*Gait, error) {
 		return NewHexapodGait(GaitType)
 	case 5:
 		return NewPentapodGait(GaitType)
+	case 7:
+		return NewHeptapodGait(GaitType)
 	}
 
 	return nil, fmt.Errorf("missing gait definition for pod with %d legs. Please update gaits.go.", NumLegs)

@@ -44,6 +44,7 @@ func (v *IsoView) TranslateY(y float64) int {
 
 func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 	DrawFrame(screen, "Isometric View", v.size, v.x, v.y, v.legendOffset)
+	joints := p.GroundJoints()
 
 	angle_z := 0 * math.Pi / 180.0
 	angle_x := 20 * math.Pi / 180.0
@@ -87,9 +88,9 @@ func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 	for l := 0; l < p.BodyDefinition.NumLegs; l++ {
 		for j := 0; j < robot.NUM_JOINTS; j++ {
 			J := mat.NewDense(4, 1, []float64{
-				p.Legs[l].Joints[j].X,
-				p.Legs[l].Joints[j].Y,
-				p.Legs[l].Joints[j].Z,
+				joints[l][j].X,
+				joints[l][j].Y,
+				joints[l][j].Z,
 				1,
 			})
 

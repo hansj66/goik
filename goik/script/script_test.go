@@ -67,16 +67,22 @@ type fakeTarget struct {
 	twists []robot.Twist
 	gaits  []string
 	moving bool
+	pose   robot.BodyPose
+	// Advances one gait cycle per 50 ticks while moving
+	cycles float64
 }
 
 func (f *fakeTarget) SetTwist(t robot.Twist) {
 	f.twists = append(f.twists, t)
 	f.moving = !t.IsZero()
 }
-func (f *fakeTarget) SetGaitByName(name string) error  { f.gaits = append(f.gaits, name); return nil }
+func (f *fakeTarget) SetGaitByName(name string) error    { f.gaits = append(f.gaits, name); return nil }
 func (f *fakeTarget) SetSwingTime(seconds float64) error { return nil }
 func (f *fakeTarget) SetStepHeight(mm float64) error     { return nil }
 func (f *fakeTarget) IsIdle() bool                       { return !f.moving }
+func (f *fakeTarget) SetBodyPose(b robot.BodyPose) error { f.pose = b; return nil }
+func (f *fakeTarget) TargetBodyPose() robot.BodyPose     { return f.pose }
+func (f *fakeTarget) Cycles() float64                    { return f.cycles }
 
 func run(t *testing.T, script string, maxTicks int) (*fakeTarget, *Runner, int, error) {
 	t.Helper()
@@ -90,6 +96,9 @@ func run(t *testing.T, script string, maxTicks int) (*fakeTarget, *Runner, int, 
 	for ; !r.Done() && ticks < maxTicks; ticks++ {
 		if err := r.Tick(robot.ENGINE_DT); err != nil {
 			return target, r, ticks, err
+		}
+		if target.moving {
+			target.cycles += 1.0 / 50
 		}
 	}
 	return target, r, ticks, nil
@@ -201,5 +210,35 @@ func TestDemoScriptOnGaitEngine(t *testing.T) {
 	}
 	if engine.IKErrors > 0 {
 		t.Errorf("%d IK errors, last: %v", engine.IKErrors, engine.LastError)
+	}
+}
+
+func TestRunnerWalkCycles(t *testing.T) {
+	_, r, ticks, err := run(t, "walk 0 10 0 cycles 2", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Done() {
+		t.Fatal("script did not finish")
+	}
+	// The fake completes a cycle per 50 ticks: 100 ticks of walking, then the final halt
+	if ticks < 100 || ticks > 103 {
+		t.Errorf("script took %d ticks, want about 101", ticks)
+	}
+}
+
+func TestRunnerBodyPose(t *testing.T) {
+	target, _, _, err := run(t, "pitch 10\nroll -5\nup 20\nshift 3 4\nyaw 15\nwait 0.1", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := robot.BodyPose{Pitch: 10, Roll: -5, Yaw: 15, X: 3, Y: 4, Z: -20}
+	if target.pose != want {
+		t.Errorf("pose = %v, want %v", target.pose, want)
+	}
+
+	target, _, _, _ = run(t, "pitch 10\ndown 5\nlevel", 100)
+	if !target.pose.IsZero() {
+		t.Errorf("level should reset the pose, got %v", target.pose)
 	}
 }

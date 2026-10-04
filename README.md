@@ -32,28 +32,31 @@ This will create an executablecalled "GOIK.exe" on windows or a GOIK executable 
 
 GOIK will open a command shell and a graphical XZ/XY and isometric view along with a visualization of the current gait pattern
 
-Type "Help" in the command shell to get a list of commands. There are 6 different preloaded models that can be played with to get a feel for the simulator. 
+Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 6 different preloaded models (`reset 0` to `reset 5`) that can be played with to get a feel for the simulator.
 
 ### Example session
 
-1. Select preloaded model #3
-1. select ripple gait
-1. change the length of the coxa segment of the two front limbs to 100mm
-1. change the default coxa_angles of the two front legs
-1. Define a stride in a given direction that repeats 10 times
-1. Set walking speed to 5 (range is 1-10)
+1. Select preloaded model #1
+1. Change the length of the coxa segment of two of the legs to 100mm
+1. Change their rest coxa angles
+1. Run the simulation in real time
+1. Walk forward in ripple gait, at 30 mm/s for 4 gait cycles. The pod steps back into its neutral stance afterwards
+1. Tilt the body and raise it while walking in an arc, then stop and level the body again
 
 ```sh
 >reset 1
->gait ripple
 >set_coxa_length 4 100
 >set_coxa_length 5 100
 >set_coxa_angle 4 -30
 >set_coxa_angle 5 30
->stride_vector 10 10 30
->speed 5
->start
->revert
+>speed 10
+>gait ripple
+>walk 0 30 0 cycles 4
+>walk 0 50 15
+>pitch 10
+>up 15
+>halt
+>level
 ```
 ![shell](./pictures/shell.png)
 
@@ -61,8 +64,9 @@ Type "Help" in the command shell to get a list of commands. There are 6 differen
 
 ### Gait engine and motion scripts
 
-The `walk` command drives a phase based gait engine. Velocity, direction and gait can be changed at any time,
-and the pod transitions smoothly (see [MOTION_CHAINING.md](./goik/MOTION_CHAINING.md)):
+The `walk` command drives a phase based gait engine. Velocity, direction, gait and body pose (`pitch`, `roll`, `yaw`,
+`up`, `down`, `shift`, `level`) can be changed at any time, and the pod transitions smoothly
+(see [MOTION_CHAINING.md](./goik/MOTION_CHAINING.md)). `halt` steps back into the neutral stance:
 
 ```sh
 >reset 1
@@ -92,7 +96,7 @@ Servo ids, orientation, offsets, soft limits and the servo model (AX-12A, STS321
 definition and are saved with `save`. Use `servos` to show the mapping, and `servo` / `servo_model` to change it.
 The mapping is used when exporting recordings, and will be used by the robot controller.
 
-The simulator allows for loading & saving of pods as well as recording of motion sequences and exporting motion primitives in a servo agnostic way. These can be stored on a microcontroller and chained / replayed given a trigger on any controller. 
+The simulator allows for loading & saving of pods as well as recording of motion sequences (`record on`) and exporting them (`export`) as raw servo positions.
 
 
 ## Experimental stuff
