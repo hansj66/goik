@@ -20,7 +20,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const POD_FOLDER = "pods"
@@ -29,7 +28,7 @@ const PRIMITIVES_FOLDER = "primitives"
 func (s *Shell) executeHelpCmd(args []string) error {
 	s.outputCh <- "Commands:"
 	s.outputCh <- "\teffectors                                  - output current end effector positions."
-	s.outputCh <- "\tgait <tripod | ripple | wave>              - select new gait."
+	s.outputCh <- "\tgait <tripod | ripple | wave>              - select new gait (blends smoothly when using walk)"
 	s.outputCh <- "\tset_coxa_length <ALL | legNum> <length>"
 	s.outputCh <- "\tset_femur_length <ALL | legNum> <length>"
 	s.outputCh <- "\tset_tibia_length <ALL | legNum> <length>"
@@ -37,6 +36,17 @@ func (s *Shell) executeHelpCmd(args []string) error {
 	s.outputCh <- "\tset_femur_angle <ALL | legNum> <angle>"
 	s.outputCh <- "\tset_tibia_angle <ALL | legNum> <angle>"
 	s.outputCh <- "\tground <height>                            - Grounds all end effectors and updates rest angles"
+	s.outputCh <- "\twalk <x> <y> <yaw>                         - Gait engine: walk with velocity x, y (mm/s) and yaw (deg/s)."
+	s.outputCh <- "\t                                             Can be changed at any time, transitions are smooth"
+	s.outputCh <- "\thalt                                       - Gait engine: slow down and step back to the neutral stance"
+	s.outputCh <- "\tswing_time <seconds>                       - Gait engine: duration of a leg swing (default 0.4)"
+	s.outputCh <- "\tengine                                     - Gait engine: show state"
+	s.outputCh <- "\trun <script>                               - Run a motion script from the scripts folder"
+	s.outputCh <- "\tabort                                      - Abort the running script and halt"
+	s.outputCh <- "\tscripts                                    - List scripts"
+	s.outputCh <- "\tservos                                     - Show the servo mapping (saved with 'save')"
+	s.outputCh <- "\tservo_model <AX-12A | STS3215 | XL-320>    - Select the servo type"
+	s.outputCh <- "\tservo <ALL | legNum> <coxa|femur|tibia> id <n> | invert <on|off> | offset <deg> | limits <min> <max>"
 	s.outputCh <- "\tstride_vector <nrepeats> <x> <y>           - Set direction. x & y are relative to current location"
 	s.outputCh <- "\tstride_angle <nrepeats> <degrees>          - Rotate around center of gravity"
 	s.outputCh <- "\tpitch <degrees>                            - Pitch move"
@@ -46,11 +56,9 @@ func (s *Shell) executeHelpCmd(args []string) error {
 	s.outputCh <- "\tdown <z>                                   - Low rider"
 	s.outputCh <- "\tstart                                      - Start pod"
 	s.outputCh <- "\tstop                                       - Stop pod"
-	s.outputCh <- "\treset <1|2|3|4|5>                          - Reset to design preset <n>"
+	s.outputCh <- "\treset <0|1|2|3|4|5>                        - Reset to design preset <n>"
 	s.outputCh <- "\tspeed                                      - speed <1-10>"
 	s.outputCh <- "\tzlift                                      - defines leg lift during swing phase"
-	s.outputCh <- "\topen <IP:port>                             - open connection to dynamixel  UDP bridge"
-	s.outputCh <- "\tclose                                      - close dynamixel connection"
 	s.outputCh <- "\tsave <filename>                            - save pod definition to file"
 	s.outputCh <- "\tload <filename>                            - load pod definition from file"
 	s.outputCh <- "\tzero                                       - Aligns all servos to zero degrees"
@@ -58,11 +66,7 @@ func (s *Shell) executeHelpCmd(args []string) error {
 	s.outputCh <- "\tstep                                       - Performs a single cycle through a gait pattern"
 	s.outputCh <- "\trevert                                     - Revert to a neutral position"
 	s.outputCh <- "\trecord <on|off>                            - Records next run or stops recording"
-	s.outputCh <- "\texport <file> <max deg> <mask>             - Save recording to a file. Servo range: 180-360."
-	s.outputCh <- "\t                                             mask is of the format \"100\", where a \"1\""
-	s.outputCh <- "\t                                             signifies that the servo horn is pointing in negative Z"
-	s.outputCh <- "\t                                             and a \"0\" that it is pointing in positive Z direction"
-	s.outputCh <- "\t                                             The bitmask order is coxa, femur, tibia"
+	s.outputCh <- "\texport <file>                              - Save recording to a file, using the servo mapping"
 
 	return nil
 }
@@ -224,7 +228,7 @@ func (s *Shell) executeSetFemurAngleCmd(args []string) error {
 		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
 			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
 		}
-		s.outputCh <- fmt.Sprintf("Changing femur angle of leg %d to %2.2f", angle)
+		s.outputCh <- fmt.Sprintf("Changing femur angle of leg %d to %2.2f", legnum, angle)
 		s.Pod.SetFemurAngle(int(legnum), angle)
 	}
 
@@ -262,14 +266,19 @@ func (s *Shell) executeSetTibiaAngleCmd(args []string) error {
 }
 
 func (s *Shell) Dispatch(command string) error {
-	command = strings.TrimSpace(command)
-	for key, value := range s.dispatchMap {
-		if len(command) >= len(key) && command[:len(key)] == key {
-			return value(strings.Split(command, " "))
-		}
+	args := strings.Fields(command)
+	if len(args) == 0 {
+		return nil
 	}
 
-	return fmt.Errorf("unknown command: '%s'", command)
+	execute, ok := s.dispatchMap[args[0]]
+	if !ok {
+		return fmt.Errorf("unknown command: '%s'", args[0])
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return execute(args)
 }
 
 func (s *Shell) executeStrideVectorCmd(args []string) error {
@@ -298,6 +307,10 @@ func (s *Shell) executeStrideVectorCmd(args []string) error {
 	// 	return fmt.Errorf("live direction transitions aren't implemented yet. Please stop and reset before switching direction")
 	// }
 
+	if err := s.leaveGaitEngine(); err != nil {
+		return err
+	}
+
 	s.Pod.ResetInterpolator()
 
 	return s.Pod.SetStrideVector(int(repeats), deltaX, deltaY)
@@ -324,6 +337,10 @@ func (s *Shell) executeStrideAngleCmd(args []string) error {
 	// 	return fmt.Errorf("live direction transitions aren't implemented yet. Please stop and reset before switching direction")
 	// }
 
+	if err := s.leaveGaitEngine(); err != nil {
+		return err
+	}
+
 	s.Pod.ResetInterpolator()
 
 	err = s.Pod.SetRotation(int(repeats), degrees)
@@ -344,7 +361,6 @@ func (s *Shell) executeStartCmd(args []string) error {
 		return fmt.Errorf("no defined stride")
 	}
 	err := s.Pod.Start()
-	networkcontroller.Start()
 
 	if err != nil {
 		return err
@@ -371,8 +387,8 @@ func (s *Shell) executeResetCmd(args []string) error {
 		return fmt.Errorf("syntax error ('reset <1|2>'): %+v", args)
 	}
 
+	s.stopScript()
 	s.Pod.Stop()
-	networkcontroller.Disconnect()
 
 	if args[1] == "0" {
 		s.Pod = robot.NewPod(robot.NewExampleHexapod0())
@@ -437,69 +453,39 @@ func (s *Shell) executeGaitCmd(args []string) error {
 		return fmt.Errorf("syntax error ('gait <tripod|ripple|wave>'): %+v", args)
 	}
 
-	for {
-		if s.Pod.IsReverting {
-			time.Sleep(time.Millisecond * 20)
-		} else {
-			break
-		}
+	if s.Pod.IsReverting {
+		return fmt.Errorf("the pod is reverting to the neutral stance. Try again when it has finished")
 	}
 
+	var gait *robot.Gait
 	var err error
 	switch args[1] {
 	case "tripod":
-		s.Pod.BodyDefinition.Gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.TRIPOD)
+		gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.TRIPOD)
 	case "ripple":
-		s.Pod.BodyDefinition.Gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.RIPPLE)
+		gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.RIPPLE)
 	case "wave":
-		s.Pod.BodyDefinition.Gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.WAVE)
+		gait, err = robot.NewGait(s.Pod.BodyDefinition.NumLegs, robot.WAVE)
 	default:
 		return fmt.Errorf("syntax error ('gait <tripod|ripple|wave>'): %+v", args)
 	}
-
-	s.Pod.ResetInterpolator()
-	// s.Pod.RevertToNutral()
-	s.Pod.SetDebugChannel(s.outputCh)
 	if err != nil {
 		return err
 	}
 
+	// The gait engine blends into the new gait while walking
+	if s.Pod.Engine != nil {
+		return s.Pod.Engine.SetGaitByName(args[1])
+	}
+
+	s.Pod.BodyDefinition.Gait = gait
+	s.Pod.ResetInterpolator()
+	// s.Pod.RevertToNutral()
+	s.Pod.SetDebugChannel(s.outputCh)
+
 	s.Pod.Start()
-	networkcontroller.Start()
 
 	return err
-}
-
-func (s *Shell) executeOpenServoPortCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('open_servo_port <IP:port>'): %+v", args)
-	}
-
-	if strings.Contains(args[1], ":") {
-		s.outputCh <- fmt.Sprintf("Opening connection to %s", args[1])
-		err := networkcontroller.Dial(args[1])
-		if err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf("syntax error ('open_servo_port <IP:port>'): %+v", args)
-	}
-
-	return nil
-}
-
-func (s *Shell) executeCloseServoPortCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 1 {
-		return fmt.Errorf("syntax error ('close_servo_port'): %+v", args)
-	}
-
-	networkcontroller.Disconnect()
-
-	return nil
 }
 
 func (s *Shell) executeSaveCmd(args []string) error {
@@ -536,8 +522,8 @@ func (s *Shell) executeLoadCmd(args []string) error {
 		return err
 	}
 
+	s.stopScript()
 	s.Pod.LoadBodyDefinition(definition)
-	s.Pod.UpdatePodStructure()
 
 	return nil
 }
@@ -546,7 +532,6 @@ func (s *Shell) executeZeroCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 	s.Pod.Zero()
 
-	networkcontroller.Start()
 
 	return nil
 }
@@ -607,13 +592,11 @@ func folderExists(path string) (bool, error) {
 func (s *Shell) executeExportCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
-	if len(args) != 4 {
-		return fmt.Errorf("syntax error ('export <filename> <servo range> <mask>'): %+v", args)
+	if len(args) == 4 {
+		return fmt.Errorf("servo range and orientation mask are now part of the servo mapping (see 'servos'). Use 'export <filename>'")
 	}
-
-	servoRange, err := strconv.ParseInt(args[2], 10, 32)
-	if err != nil {
-		return fmt.Errorf("syntax error ('export <filename> <servo range>' <mask>): %+v", args)
+	if len(args) != 2 {
+		return fmt.Errorf("syntax error ('export <filename>'): %+v", args)
 	}
 
 	exists, err := folderExists(fmt.Sprintf("./%s", PRIMITIVES_FOLDER))
@@ -628,31 +611,23 @@ func (s *Shell) executeExportCmd(args []string) error {
 		}
 	}
 
-	if len(args[3]) != 3 {
-		return fmt.Errorf("invalid bit mask: %+v", args[3])
-	}
-
-	maskOk := true
-	for _, bit := range args[3] {
-		if bit != '0' && bit != '1' {
-			maskOk = false
-		}
-	}
-	if !maskOk {
-		return fmt.Errorf("invalid bit mask: %+v", args[3])
-	}
-
 	if !s.Pod.IsRecording {
 		return fmt.Errorf("no recording started. nothing to export")
 	}
 
-	s.Pod.MotionPrimitive.Export(fmt.Sprintf("./%s/%s", PRIMITIVES_FOLDER, args[1]), int(servoRange), args[3][0] == '1', args[3][1] == '1', args[3][2] == '1')
+	mapping := s.Pod.BodyDefinition.ServoMapping()
+	path := fmt.Sprintf("./%s/%s", PRIMITIVES_FOLDER, args[1])
+	clamped, err := s.Pod.MotionPrimitive.Export(path, mapping, s.Pod.BodyDefinition.NumLegs)
+	if err != nil {
+		return err
+	}
 
-	s.outputCh <- fmt.Sprintf("Servoangles normalized for %d degrees", servoRange)
-	s.outputCh <- "\tMidpoint equals raw value 512"
-	s.outputCh <- fmt.Sprintf("\tnegative %d degrees equals raw value 0", servoRange/2)
-	s.outputCh <- fmt.Sprintf("\tpositive %d degrees equals raw value 1024", servoRange/2)
-	s.outputCh <- fmt.Sprintf("Recording exported to : ./%s/%s", PRIMITIVES_FOLDER, args[1])
+	model := robot.ServoModels[mapping.Model]
+	s.outputCh <- fmt.Sprintf("Servo angles mapped for %s (%2.0f degrees, %d positions, midpoint %d)", model.Name, model.RangeDegrees, model.Resolution, model.Resolution/2)
+	if clamped > 0 {
+		s.outputCh <- fmt.Sprintf("WARNING: %d values were outside the servo range or limits and have been clamped", clamped)
+	}
+	s.outputCh <- fmt.Sprintf("Recording exported to : %s", path)
 
 	s.Pod.ClearPrimitives()
 

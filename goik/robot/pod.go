@@ -82,6 +82,8 @@ type Pod struct {
 	// tick indicates the total number of movement update ticks
 	tick         int
 	debugChannel chan string
+	// Engine is the phase based gait engine. When set, it replaces the table based gait in Update()
+	Engine *GaitEngine
 }
 
 func (p *Pod) SetDirection(direction Direction) {
@@ -214,6 +216,8 @@ func (p *Pod) LoadBodyDefinition(BodyDefinition *BodyDefinition) {
 	p.direction = Forward
 	p.MotionPrimitive = NewMotionPrimitive()
 	p.BodyDefinition = BodyDefinition
+	// The gait engine holds per leg state, so it has to be recreated for a new body
+	p.Engine = nil
 
 	p.UpdatePodStructure()
 }
@@ -349,6 +353,9 @@ func (p *Pod) ResetInterpolator() {
 
 // IsSwingPhase returns true if the leg with index == legIndex is currently in the swing phase
 func (p *Pod) IsSwingPhase(legIndex int) bool {
+	if p.Engine != nil {
+		return p.Engine.Legs[legIndex].Swinging
+	}
 	return (*p.BodyDefinition.Gait.Pattern)[legIndex][p.CurrentGaitIndex] == 1
 }
 
@@ -458,6 +465,11 @@ func (p *Pod) UpdateRevertingToNeutral() {
 // the gait cycle or the revert cycle (depending on the current state of the
 // robot)
 func (p *Pod) Update() {
+	if p.Engine != nil {
+		p.updateEngine()
+		return
+	}
+
 	if p.IsWalking && !p.IsReverting {
 		if p.targetGaitCycles == 0 || (p.currentGaitCycle < p.targetGaitCycles) {
 			p.UpdateMovement()
@@ -468,6 +480,23 @@ func (p *Pod) Update() {
 
 	if p.HasDefinedStride && p.IsReverting {
 		p.UpdateRevertingToNeutral()
+	}
+}
+
+// updateEngine advances the gait engine one tick
+func (p *Pod) updateEngine() {
+	p.Engine.Tick(ENGINE_DT)
+	if p.Engine.IsIdle() {
+		return
+	}
+
+	p.tick += 1
+	p.CurrentGaitIndex = p.Engine.PatternIndex(p.BodyDefinition.Gait.NumIndicesInPattern)
+
+	if p.IsRecording {
+		for _, l := range p.Legs {
+			p.MotionPrimitive.Add(l.ServoAngles)
+		}
 	}
 }
 
@@ -485,6 +514,28 @@ func (p *Pod) RevertToNutral() {
 // ClearPrimitives purges all recorded data
 func (p *Pod) ClearPrimitives() {
 	p.MotionPrimitive.Clear()
+}
+
+// ReachRadius returns the largest radius (in mm, 5 mm resolution) around the neutral end effector
+// positions that every leg can reach, both on the ground and with the foot lifted by lift mm.
+func (p *Pod) ReachRadius(lift float64) float64 {
+	const directions = 16
+	reach := 0.0
+	for r := 5.0; r <= 200; r += 5 {
+		for _, l := range p.Legs {
+			n := l.NeutralEffectorCoordinate
+			for d := 0; d < directions; d++ {
+				a := 2 * math.Pi * float64(d) / directions
+				for _, z := range []float64{n.Z, n.Z - lift} {
+					if _, err := SolveEffectorIK(l, NewCoordinate(n.X+r*math.Cos(a), n.Y+r*math.Sin(a), z), p.debugChannel); err != nil {
+						return reach
+					}
+				}
+			}
+		}
+		reach = r
+	}
+	return reach
 }
 
 // Zero resets all servo angles in the robot to 0 degrees.

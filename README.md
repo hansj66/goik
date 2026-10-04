@@ -14,7 +14,7 @@ It has so far been tested on Mac and Windows
 
 ## Kinematics
 
-A description of the forward and inverse kinematics equations used can be found [here](./goik/README.md) along with some info on how to interface Dynamixel servos. (I used my own [ESP32 based dynamixel board](https://github.com/hansj66/automaton-xl320) when testing). The code is servo agnostic, you will only need to specify servo orientation (up/down) + range if you plan on recording any motion primitives for use on a microcontroller board.
+A description of the forward and inverse kinematics equations used can be found [here](./goik/README.md) along with some info on how to interface Dynamixel servos. The code is servo agnostic. Servo ids, orientation and range are defined in the servo mapping (see below). The target robot controller is the Raspberry Pi CM5 based [Overlord](https://github.com/hansj66/overlord) board.
 
 ## Building the simulator
 
@@ -59,12 +59,45 @@ Type "Help" in the command shell to get a list of commands. There are 6 differen
 
 ![simulator](./pictures/simulator.png)
 
+### Gait engine and motion scripts
+
+The `walk` command drives a phase based gait engine. Velocity, direction and gait can be changed at any time,
+and the pod transitions smoothly (see [MOTION_CHAINING.md](./goik/MOTION_CHAINING.md)):
+
+```sh
+>reset 1
+>speed 10
+>walk 0 80 0
+>gait wave
+>walk 0 50 15
+>halt
+```
+
+Sequences of motions can be written as scripts in the `goik/scripts` folder and played with `run <name>`
+(`scripts` lists them, `abort` stops the running script). See [demo.goik](./goik/scripts/demo.goik):
+
+```sh
+gait tripod
+walk 0 80 0 for 3          # forward, 80 mm/s for 3 seconds
+walk 0 0 20 for 3          # turn on the spot
+repeat 2                   # run the block above twice
+gait wave
+walk 0 40 0 for 5
+halt                       # step back into the neutral stance
+```
+
+### Servo mapping
+
+Servo ids, orientation, offsets, soft limits and the servo model (AX-12A, STS3215, XL-320) are part of the pod
+definition and are saved with `save`. Use `servos` to show the mapping, and `servo` / `servo_model` to change it.
+The mapping is used when exporting recordings, and will be used by the robot controller.
+
 The simulator allows for loading & saving of pods as well as recording of motion sequences and exporting motion primitives in a servo agnostic way. These can be stored on a microcontroller and chained / replayed given a trigger on any controller. 
 
 
 ## Experimental stuff
 
-I have experimented with streaming servo positions over UDP as well as recording motion primitives for playback on a microcontroller. Consider this part of GOIK as _experimental_
+Recording and exporting motion primitives (`record` / `export`) is _experimental_. Earlier versions also streamed servo positions over UDP to an ESP32 based controller. That has been removed in favour of running the gait engine directly on the [Overlord](https://github.com/hansj66/overlord) controller (see [MOTION_CHAINING.md](./goik/MOTION_CHAINING.md)).
 
 ## Future work
 

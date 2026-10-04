@@ -1,0 +1,21 @@
+# Demo of chained motion primitives. Run it in the simulator with: run demo
+#
+# Velocities: walk <x mm/s> <y mm/s> <yaw degrees/s> [for <seconds>]
+
+gait tripod
+walk 0 80 0 for 3          # forward
+walk 0 0 20 for 3          # turn on the spot
+walk 0 50 15 for 4         # arc
+repeat 2                   # run the three moves above twice
+
+gait wave                  # blend into wave gait while walking
+walk 0 40 0 for 5
+gait ripple
+walk 40 0 0 for 4          # sideways
+gait tripod
+walk -50 50 0 for 3        # diagonally
+
+halt                       # step back into the neutral stance
+wait 1
+step_height 30             # lower steps
+walk 0 -60 0 for 3         # backwards

@@ -1,6 +1,0 @@
-./esp32/udp_dxl/build
-./esp32/udp_dxl/managed_components
-./esp32/udp_dxl/dependencies.lock
-./esp32/udp_dxl/sdkconfig
-*.exe
-

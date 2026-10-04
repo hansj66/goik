@@ -15,17 +15,17 @@
 package simulator
 
 import (
-	"GOIK/comms"
 	"GOIK/robot"
 	"GOIK/views"
+	"fmt"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 const window_size = 1024
 
-var networkcontroller comms.NetworkController
 
 type Game struct {
 	views views.RenderViews
@@ -48,10 +48,13 @@ var counter int = 0
 
 func (g *Game) Update() error {
 
+	g.Shell.mu.Lock()
+	defer g.Shell.mu.Unlock()
+
 	counter++
 	if counter >= 3*DELAY_COUNTER {
+		g.Shell.tickScript()
 		g.Shell.Pod.Update()
-		networkcontroller.Update()
 		counter = 0
 	}
 
@@ -59,8 +62,25 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	g.Shell.mu.Lock()
+	defer g.Shell.mu.Unlock()
+
 	for _, v := range g.views {
 		v.Render(screen, g.Shell.Pod)
+	}
+
+	// Gait engine and script status (bottom of the gait view)
+	if e := g.Shell.Pod.Engine; e != nil {
+		state := "walking"
+		if e.IsIdle() {
+			state = "idle"
+		} else if e.IsTransitioning() {
+			state = "transitioning"
+		}
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Engine: %s %s, cycle %2.2f s, IK errors: %d", state, e.GetTwist().String(), e.CycleTime(), e.IKErrors), 20, window_size-60)
+	}
+	if g.Shell.Script != nil {
+		ebitenutil.DebugPrintAt(screen, "Script: "+g.Shell.Script.Status(), 20, window_size-40)
 	}
 }
 
@@ -78,8 +98,6 @@ func Run() {
 	go shell.Run()
 	g := NewGame(shell)
 
-	// Create a robot network controller
-	networkcontroller = *comms.NewNetworkController(1, pod, shell.outputCh)
 
 	// Create main window and start the simulation
 	ebiten.SetWindowSize(window_size, window_size)

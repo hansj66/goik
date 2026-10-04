@@ -142,6 +142,19 @@ func NewHexapodGait(GaitType GaitType) (*Gait, error) {
 	}, nil
 }
 
+// ParseGaitType converts a gait name (tripod, ripple or wave) to a GaitType
+func ParseGaitType(name string) (GaitType, error) {
+	switch name {
+	case "tripod":
+		return TRIPOD, nil
+	case "ripple":
+		return RIPPLE, nil
+	case "wave":
+		return WAVE, nil
+	}
+	return TRIPOD, fmt.Errorf("unknown gait '%s' (tripod, ripple or wave)", name)
+}
+
 func NewGait(NumLegs int, GaitType GaitType) (*Gait, error) {
 
 	switch NumLegs {

@@ -39,6 +39,16 @@ type BodyDefinition struct {
 	Segments []SegmentLengths `json:"Segments"`
 	// The angles (in degrees) for a robot in a neutral/rest stance
 	RestAngles []ServoAngles `json:"Angles"`
+	// Maps joints to physical servos. Nil means the default mapping (see ServoMapping())
+	Servos *ServoMapping `json:"Servos,omitempty"`
+}
+
+// ServoMapping returns the pod's servo mapping, creating the default mapping if none is defined
+func (b *BodyDefinition) ServoMapping() *ServoMapping {
+	if b.Servos == nil {
+		b.Servos = NewDefaultServoMapping(b.NumLegs)
+	}
+	return b.Servos
 }
 
 // Save saves the current body definition to a file.
@@ -64,26 +74,24 @@ func (b *BodyDefinition) Save(filename string) error {
 // Load loads a body definition from a saved definition file.
 func (b *BodyDefinition) Load(filename string) (*BodyDefinition, error) {
 
-	fi, err := os.Open(filename)
+	buf, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
-
-	defer fi.Close()
-
-	buf := make([]byte, 1024)
-	n, err := fi.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-	if n == 0 {
+	if len(buf) == 0 {
 		return nil, fmt.Errorf("Zero bytes read")
 	}
 
 	var definition BodyDefinition
-	err = json.Unmarshal(buf[:n], &definition)
+	err = json.Unmarshal(buf, &definition)
 	if err != nil {
 		return nil, err
+	}
+
+	if definition.Servos != nil {
+		if err := definition.Servos.Validate(definition.NumLegs); err != nil {
+			return nil, fmt.Errorf("%s: %w", filename, err)
+		}
 	}
 
 	return &definition, nil

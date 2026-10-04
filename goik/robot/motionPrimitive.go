@@ -20,8 +20,7 @@ import (
 
 // A MotionPrimitive consists of a set of joint motion sequences
 type MotionPrimitive struct {
-	rawAngles        []ServoAngles
-	normalizedAngles []byte
+	rawAngles []ServoAngles
 }
 
 func NewMotionPrimitive() *MotionPrimitive {
@@ -38,44 +37,20 @@ func (m *MotionPrimitive) Size() int {
 
 func (m *MotionPrimitive) Clear() {
 	m.rawAngles = nil
-	m.normalizedAngles = nil
 }
 
-func (m *MotionPrimitive) normalize(servoRange int, invertedCoxa bool, invertedFemur bool, invertedTibia bool) {
-	for _, a := range m.rawAngles {
-
-		var joint uint16
-		if invertedCoxa {
-			joint = 1024 - uint16((a.Coxa/float64(servoRange))*1024+512)
-		} else {
-			joint = uint16((a.Coxa/float64(servoRange))*1024 + 512)
+// Export writes the recording as raw servo positions (2 bytes, little endian, per servo in leg
+// order coxa, femur, tibia). The frames contain numLegs legs each. Returns the number of clamped values.
+func (m *MotionPrimitive) Export(path string, mapping *ServoMapping, numLegs int) (int, error) {
+	var data []byte
+	clamped := 0
+	for frame := 0; frame+numLegs <= len(m.rawAngles); frame += numLegs {
+		for _, t := range mapping.Targets(m.rawAngles[frame : frame+numLegs]) {
+			data = append(data, uint8(t.Position&0xFF), uint8(t.Position>>8))
+			if t.Clamped {
+				clamped++
+			}
 		}
-		m.normalizedAngles = append(m.normalizedAngles, uint8(joint&0xFF))
-		m.normalizedAngles = append(m.normalizedAngles, uint8((joint&0xFF00)>>8))
-
-		if invertedFemur {
-			joint = 1024 - uint16((a.Femur/float64(servoRange))*1024+512)
-		} else {
-			joint = uint16((a.Femur/float64(servoRange))*1024 + 512)
-		}
-		m.normalizedAngles = append(m.normalizedAngles, uint8(joint&0xFF))
-		m.normalizedAngles = append(m.normalizedAngles, uint8((joint&0xFF00)>>8))
-
-		if invertedTibia {
-			joint = 1024 - uint16((a.Tibia/float64(servoRange))*1024+512)
-		} else {
-			joint = uint16((a.Tibia/float64(servoRange))*1024 + 512)
-		}
-		m.normalizedAngles = append(m.normalizedAngles, uint8(joint&0xFF))
-		m.normalizedAngles = append(m.normalizedAngles, uint8((joint&0xFF00)>>8))
 	}
-}
-
-func (m *MotionPrimitive) createFile(path string) error {
-	return os.WriteFile(path, m.normalizedAngles, 0644)
-}
-
-func (m *MotionPrimitive) Export(path string, servoRange int, invertedCoxa bool, invertedFemur bool, invertedTibia bool) error {
-	m.normalize(servoRange, invertedCoxa, invertedFemur, invertedTibia)
-	return m.createFile(path)
+	return clamped, os.WriteFile(path, data, 0644)
 }

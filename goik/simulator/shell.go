@@ -16,8 +16,10 @@ package simulator
 
 import (
 	"GOIK/robot"
+	"GOIK/script"
 	"log"
 	"strings"
+	"sync"
 
 	"github.com/borud/chatui"
 )
@@ -29,6 +31,11 @@ type Shell struct {
 	outputCh    chan string
 	commandCh   chan string
 	dispatchMap map[string]dispatchFunc
+	// Script is the running motion script (nil if none)
+	Script *script.Runner
+	// mu protects Pod and Script. Commands run on the shell goroutine, while
+	// Ebiten updates and draws on its own goroutine
+	mu sync.Mutex
 }
 
 func NewShell(pod *robot.Pod) *Shell {
@@ -53,8 +60,6 @@ func NewShell(pod *robot.Pod) *Shell {
 		"speed":            s.executeSpeedCmd,
 		"zlift":            s.executeZLiftCmd,
 		"gait":             s.executeGaitCmd,
-		"open":             s.executeOpenServoPortCmd,
-		"close":            s.executeCloseServoPortCmd,
 		"save":             s.executeSaveCmd,
 		"load":             s.executeLoadCmd,
 		"zero":             s.executeZeroCmd,
@@ -70,6 +75,16 @@ func NewShell(pod *robot.Pod) *Shell {
 		"up":               s.executeUpCmd,
 		"down":             s.executeDownCmd,
 		"ground":           s.executeGroundCmd,
+		"walk":             s.executeWalkCmd,
+		"halt":             s.executeHaltCmd,
+		"swing_time":       s.executeSwingTimeCmd,
+		"engine":           s.executeEngineCmd,
+		"run":              s.executeRunCmd,
+		"abort":            s.executeAbortCmd,
+		"scripts":          s.executeScriptsCmd,
+		"servos":           s.executeServosCmd,
+		"servo":            s.executeServoCmd,
+		"servo_model":      s.executeServoModelCmd,
 	}
 
 	return &s
