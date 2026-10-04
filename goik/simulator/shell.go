@@ -20,6 +20,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/borud/chatui"
 )
@@ -38,12 +39,15 @@ type Shell struct {
 	// mu protects Pod and Script. Commands run on the shell goroutine, while
 	// Ebiten updates and draws on its own goroutine
 	mu sync.Mutex
+	// The chat UI, and a channel that is closed when it has exited
+	ui   *chatui.ChatUI
+	done chan struct{}
 }
 
 func NewShell(pod *robot.Pod) *Shell {
 	// The command channel is buffered, since the chat UI sends commands from its event loop and
 	// would freeze until the previous command has been dispatched
-	s := Shell{Pod: pod, outputCh: make(chan string, 100), commandCh: make(chan string, 16)}
+	s := Shell{Pod: pod, outputCh: make(chan string, 100), commandCh: make(chan string, 16), done: make(chan struct{})}
 
 	s.Pod.SetDebugChannel(s.outputCh)
 
@@ -91,6 +95,9 @@ func NewShell(pod *robot.Pod) *Shell {
 
 func (s *Shell) Run() {
 
+	// The simulator window closes when the chat UI exits
+	defer close(s.done)
+
 	chatui := chatui.New(chatui.Config{
 		OutputCh:     s.outputCh,
 		CommandCh:    s.commandCh,
@@ -98,6 +105,9 @@ func (s *Shell) Run() {
 		BlockCtrlC:   true,
 		HistorySize:  10,
 	})
+	s.mu.Lock()
+	s.ui = chatui
+	s.mu.Unlock()
 
 	s.outputCh <- "Pod playground"
 
@@ -105,6 +115,7 @@ func (s *Shell) Run() {
 		for command := range s.commandCh {
 			if strings.ToLower(command) == "/quit" {
 				chatui.Stop()
+				return
 			}
 			err := s.Dispatch(command)
 			if err != nil {
@@ -130,6 +141,26 @@ func (s *Shell) Run() {
 
 	err := chatui.Run()
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+	}
+}
+
+// Done returns a channel that is closed when the chat UI has exited
+func (s *Shell) Done() <-chan struct{} {
+	return s.done
+}
+
+// Stop stops the chat UI (restoring the terminal) and waits briefly for it to exit
+func (s *Shell) Stop() {
+	s.mu.Lock()
+	ui := s.ui
+	s.mu.Unlock()
+	if ui == nil {
+		return
+	}
+	ui.Stop()
+	select {
+	case <-s.done:
+	case <-time.After(time.Second):
 	}
 }

@@ -46,6 +46,12 @@ var DELAY_COUNTER int = 10
 var counter int = 0
 
 func (g *Game) Update() error {
+	// Close the window when the shell has quit
+	select {
+	case <-g.Shell.Done():
+		return ebiten.Termination
+	default:
+	}
 
 	g.Shell.mu.Lock()
 	defer g.Shell.mu.Unlock()
@@ -100,7 +106,11 @@ func Run() {
 	// Create main window and start the simulation
 	ebiten.SetWindowSize(window_size, window_size)
 	ebiten.SetWindowTitle("Pod simulator")
-	if err := ebiten.RunGame(g); err != nil {
+	err := ebiten.RunGame(g)
+
+	// The window was closed (or the shell quit): stop the chat UI, so the terminal is restored
+	shell.Stop()
+	if err != nil {
 		log.Fatal(err)
 	}
 }
