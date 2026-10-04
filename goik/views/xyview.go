@@ -60,13 +60,15 @@ func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 		vector.StrokeCircle(screen, float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y)), 4, 1, NeutralClr(), true)
 	}
 
-	// Foot trails (ground frame)
+	// Foot trails (ground frame), drawn as one path
 	v.updateTrails(joints)
-	for _, trail := range v.trails {
+	polylines := make([][][2]float32, len(v.trails))
+	for l, trail := range v.trails {
 		for _, c := range trail {
-			vector.DrawFilledCircle(screen, float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y)), 1, TrailClr(), false)
+			polylines[l] = append(polylines[l], [2]float32{float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y))})
 		}
 	}
+	StrokePaths(screen, polylines, 1, TrailClr())
 
 	// Where swinging feet will land
 	if p.Engine != nil {

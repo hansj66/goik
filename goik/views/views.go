@@ -16,6 +16,7 @@ package views
 
 import (
 	"GOIK/robot"
+	"image"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -57,6 +58,45 @@ func NeutralClr() color.Color {
 
 func StanceActiveClr() color.Color {
 	return color.RGBA{64, 64, 64, 1}
+}
+
+var (
+	whiteImage    = ebiten.NewImage(3, 3)
+	whiteSubImage = whiteImage.SubImage(image.Rect(1, 1, 2, 2)).(*ebiten.Image)
+)
+
+func init() {
+	whiteImage.Fill(color.White)
+}
+
+// StrokePaths draws polylines (one per slice of points) with a single draw call.
+// Much cheaper than drawing many small shapes one at a time.
+func StrokePaths(dst *ebiten.Image, polylines [][][2]float32, width float32, clr color.Color) {
+	var path vector.Path
+	for _, points := range polylines {
+		for i, pt := range points {
+			if i == 0 {
+				path.MoveTo(pt[0], pt[1])
+			} else {
+				path.LineTo(pt[0], pt[1])
+			}
+		}
+	}
+
+	vs, is := path.AppendVerticesAndIndicesForStroke(nil, nil, &vector.StrokeOptions{Width: width})
+	r, g, b, a := clr.RGBA()
+	for i := range vs {
+		vs[i].SrcX = 1
+		vs[i].SrcY = 1
+		vs[i].ColorR = float32(r) / 0xffff
+		vs[i].ColorG = float32(g) / 0xffff
+		vs[i].ColorB = float32(b) / 0xffff
+		vs[i].ColorA = float32(a) / 0xffff
+	}
+
+	op := &ebiten.DrawTrianglesOptions{}
+	op.ColorScaleMode = ebiten.ColorScaleModePremultipliedAlpha
+	dst.DrawTriangles(vs, is, whiteSubImage, op)
 }
 
 type View interface {

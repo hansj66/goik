@@ -41,7 +41,9 @@ type Shell struct {
 }
 
 func NewShell(pod *robot.Pod) *Shell {
-	s := Shell{Pod: pod, outputCh: make(chan string, 10), commandCh: make(chan string)}
+	// The command channel is buffered, since the chat UI sends commands from its event loop and
+	// would freeze until the previous command has been dispatched
+	s := Shell{Pod: pod, outputCh: make(chan string, 100), commandCh: make(chan string, 16)}
 
 	s.Pod.SetDebugChannel(s.outputCh)
 
