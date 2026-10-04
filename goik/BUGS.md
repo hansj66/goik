@@ -79,5 +79,5 @@ Found while reading the Overlord repository (not verified on hardware).
 
 | # | Sev | Bug |
 |---|-----|-----|
-| 42 | Low | `cpu.pprof` is a committed profiling artefact. (`h1.hex` and `h2.hex`, old saved robot definitions, have been removed.) |
+| 42 | Low | **(fixed)** Committed artefacts: `cpu.pprof` (profiling output) and `h1.hex`/`h2.hex` (old saved robot definitions) have been removed. |
 | 43 | Low | No tests for the table based gait (the new gait engine has tests in `robot/gaitEngine_test.go`). The gait timing bugs above are easy to cover with table-driven tests. |
