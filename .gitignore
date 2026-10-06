@@ -1,0 +1,6 @@
+# Simulator binaries (Windows / macOS / Linux)
+*.exe
+/goik/GOIK
+
+# Vendor CAD files are downloaded locally and not redistributed (see goik/CAD_FILES.md)
+/goik/cad/vendor/
