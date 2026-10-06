@@ -201,6 +201,10 @@ type GaitEngine struct {
 	cycles float64
 	// Twist applied to the body in the last tick (after stride and reach limits)
 	applied Twist
+	// Odometry: the body's position (mm) and heading (radians) in the world, integrated from the applied twist
+	odometryX       float64
+	odometryY       float64
+	odometryHeading float64
 	// Landing targets from the last tick
 	targets []Coordinate
 
@@ -369,6 +373,7 @@ func (e *GaitEngine) Tick(dt float64) {
 	}
 	e.idle = false
 	e.applied = twist
+	e.updateOdometry(twist, dt)
 
 	cycles := dt / e.CycleTime()
 	e.cycles += cycles
@@ -407,6 +412,33 @@ func (e *GaitEngine) Cycles() float64 {
 // The second return value is false if the leg is not swinging.
 func (e *GaitEngine) LandingTarget(legIndex int) (Coordinate, bool) {
 	return e.targets[legIndex], e.Legs[legIndex].Swinging
+}
+
+// updateOdometry integrates the body's motion in the world. It mirrors moveWithGround (rotate, then
+// translate), so a grounded foot keeps exactly the same world position from tick to tick.
+func (e *GaitEngine) updateOdometry(t Twist, dt float64) {
+	e.odometryHeading += t.Yaw * math.Pi / 180 * dt
+	c, s := math.Cos(e.odometryHeading), math.Sin(e.odometryHeading)
+	e.odometryX += (c*t.X - s*t.Y) * dt
+	e.odometryY += (s*t.X + c*t.Y) * dt
+}
+
+// Odometry returns the body's position (mm) and heading (degrees) in the world since the engine was created
+func (e *GaitEngine) Odometry() (x float64, y float64, heading float64) {
+	return e.odometryX, e.odometryY, e.odometryHeading * 180 / math.Pi
+}
+
+// WorldToGround transforms a world position (mm) to the ground reference frame, which moves with the pod
+func (e *GaitEngine) WorldToGround(x float64, y float64) (float64, float64) {
+	dx, dy := x-e.odometryX, y-e.odometryY
+	c, s := math.Cos(-e.odometryHeading), math.Sin(-e.odometryHeading)
+	return c*dx - s*dy, s*dx + c*dy
+}
+
+// GroundToWorld transforms a position in the ground reference frame to the world
+func (e *GaitEngine) GroundToWorld(x float64, y float64) (float64, float64) {
+	c, s := math.Cos(e.odometryHeading), math.Sin(e.odometryHeading)
+	return e.odometryX + c*x - s*y, e.odometryY + s*x + c*y
 }
 
 // Stride returns the longest distance (mm) a foot travels during a stance phase at the current velocity

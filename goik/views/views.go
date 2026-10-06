@@ -18,6 +18,7 @@ import (
 	"GOIK/robot"
 	"image"
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -54,6 +55,14 @@ func TrailClr() color.Color {
 
 func NeutralClr() color.Color {
 	return color.RGBA{90, 90, 90, 255}
+}
+
+func GridClr() color.Color {
+	return color.RGBA{50, 50, 50, 255}
+}
+
+func PathClr() color.Color {
+	return color.RGBA{210, 150, 40, 255}
 }
 
 func StanceActiveClr() color.Color {
@@ -97,6 +106,40 @@ func StrokePaths(dst *ebiten.Image, polylines [][][2]float32, width float32, clr
 	op := &ebiten.DrawTrianglesOptions{}
 	op.ColorScaleMode = ebiten.ColorScaleModePremultipliedAlpha
 	dst.DrawTriangles(vs, is, whiteSubImage, op)
+}
+
+// Spacing (mm) of the ground grid, and how far around the pod it is drawn
+const GRID_SPACING = 50.0
+const GRID_RADIUS = 400.0
+
+// GroundGrid returns the lines of a grid that is fixed in the world, in the pod's ground reference
+// frame. As the pod walks and turns, the grid moves and rotates under it. Each line is two points.
+func GroundGrid(p *robot.Pod) [][2][2]float64 {
+	toGround := func(x float64, y float64) (float64, float64) { return x, y }
+	wx, wy := 0.0, 0.0
+	if p.Engine != nil {
+		toGround = p.Engine.WorldToGround
+		wx, wy, _ = p.Engine.Odometry()
+	}
+
+	var lines [][2][2]float64
+	line := func(x0, y0, x1, y1 float64) {
+		gx0, gy0 := toGround(x0, y0)
+		gx1, gy1 := toGround(x1, y1)
+		lines = append(lines, [2][2]float64{{gx0, gy0}, {gx1, gy1}})
+	}
+	for k := math.Floor((wx - GRID_RADIUS) / GRID_SPACING); k*GRID_SPACING <= wx+GRID_RADIUS; k++ {
+		line(k*GRID_SPACING, wy-GRID_RADIUS, k*GRID_SPACING, wy+GRID_RADIUS)
+	}
+	for k := math.Floor((wy - GRID_RADIUS) / GRID_SPACING); k*GRID_SPACING <= wy+GRID_RADIUS; k++ {
+		line(wx-GRID_RADIUS, k*GRID_SPACING, wx+GRID_RADIUS, k*GRID_SPACING)
+	}
+	return lines
+}
+
+// Clip returns the part of the screen covered by a view. Drawing on it is clipped to the view.
+func Clip(screen *ebiten.Image, x float32, y float32, size float32) *ebiten.Image {
+	return screen.SubImage(image.Rect(int(x), int(y), int(x+size), int(y+size))).(*ebiten.Image)
 }
 
 type View interface {

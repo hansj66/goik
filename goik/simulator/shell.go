@@ -39,6 +39,8 @@ type Shell struct {
 	// mu protects Pod and Script. Commands run on the shell goroutine, while
 	// Ebiten updates and draws on its own goroutine
 	mu sync.Mutex
+	// Set by the clear command. The game loop clears the XY view's body path and foot trails
+	clearTrails bool
 	// The chat UI, and a channel that is closed when it has exited
 	ui   *chatui.ChatUI
 	done chan struct{}
@@ -74,6 +76,7 @@ func NewShell(pod *robot.Pod) *Shell {
 		"halt":             s.executeHaltCmd,
 		"swing_time":       s.executeSwingTimeCmd,
 		"engine":           s.executeEngineCmd,
+		"clear":            s.executeClearCmd,
 		"step_height":      s.executeStepHeightCmd,
 		"pitch":            s.executePoseCmd,
 		"roll":             s.executePoseCmd,

@@ -31,6 +31,9 @@ type XyView struct {
 	legendOffset float32
 	// Recent foot positions per leg
 	trails [][]robot.Coordinate
+	// The body's path in world coordinates, and the gait engine it was recorded from
+	path       [][2]float64
+	pathEngine *robot.GaitEngine
 }
 
 func NewXyView(x float32, y float32, size float32) *XyView {
@@ -48,11 +51,36 @@ func (v *XyView) TranslateY(y float64) int {
 // Number of positions kept per foot for the trail
 const TRAIL_LENGTH = 120
 
+// Number of positions kept for the body's path, and the minimum distance (mm) between them
+const PATH_LENGTH = 3000
+const PATH_RESOLUTION = 2.0
+
 func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 
 	DrawFrame(screen, "XY View ", v.size, v.x, v.y, v.legendOffset)
 	joints := p.GroundJoints()
 	n := p.BodyDefinition.NumLegs
+
+	// Ground grid and the body's path. They are fixed in the world, so they move as the pod walks
+	clip := Clip(screen, v.x, v.y, v.size)
+	var gridLines [][][2]float32
+	for _, l := range GroundGrid(p) {
+		gridLines = append(gridLines, [][2]float32{
+			{float32(v.TranslateX(l[0][0])), float32(v.TranslateY(l[0][1]))},
+			{float32(v.TranslateX(l[1][0])), float32(v.TranslateY(l[1][1]))},
+		})
+	}
+	StrokePaths(clip, gridLines, 1, GridClr())
+
+	v.updatePath(p.Engine)
+	if p.Engine != nil && len(v.path) > 1 {
+		var path [][2]float32
+		for _, w := range v.path {
+			x, y := p.Engine.WorldToGround(w[0], w[1])
+			path = append(path, [2]float32{float32(v.TranslateX(x)), float32(v.TranslateY(y))})
+		}
+		StrokePaths(clip, [][][2]float32{path}, 2, PathClr())
+	}
 
 	// Neutral foot positions
 	for _, l := range p.Legs {
@@ -121,6 +149,34 @@ func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 	// Annotate legs with lex indexes
 	for l := 0; l < n; l++ {
 		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", l), v.TranslateX(joints[l][3].X+15), v.TranslateY(joints[l][3].Y+5))
+	}
+}
+
+// ClearTrails forgets the body's path and the foot trails
+func (v *XyView) ClearTrails() {
+	v.path = nil
+	v.trails = nil
+}
+
+// updatePath records the body's position in the world. The path restarts when the engine is recreated.
+func (v *XyView) updatePath(e *robot.GaitEngine) {
+	if e != v.pathEngine {
+		v.path = nil
+		v.pathEngine = e
+	}
+	if e == nil {
+		return
+	}
+	x, y, _ := e.Odometry()
+	if len(v.path) > 0 {
+		last := v.path[len(v.path)-1]
+		if math.Hypot(x-last[0], y-last[1]) < PATH_RESOLUTION {
+			return
+		}
+	}
+	v.path = append(v.path, [2]float64{x, y})
+	if len(v.path) > PATH_LENGTH {
+		v.path = v.path[len(v.path)-PATH_LENGTH:]
 	}
 }
 

@@ -73,6 +73,9 @@ ripple (changing direction) → tripod (diagonal) → halt on three example hexa
 
 The XY view shows the feet's recent trails, the neutral foot positions (circles) and where swinging
 feet will land (blue rings). All views draw the pod in the ground frame, so the body pose is visible.
+The engine integrates the applied velocity into odometry (`Odometry()`, shown by `engine`). The XY
+and isometric views use it to draw a 50 mm ground grid that is fixed in the world, so it moves and
+rotates under the pod as it walks, and the XY view draws the body's path (orange).
 
 `record on` / `export` work while the engine is running. Idle ticks are not recorded.
 

@@ -135,6 +135,16 @@ func (s *Shell) executeSwingTimeCmd(args []string) error {
 	return engine.SetSwingTime(seconds)
 }
 
+func (s *Shell) executeClearCmd(args []string) error {
+	s.outputCh <- fmt.Sprintf("%+v", args)
+
+	if len(args) != 1 {
+		return fmt.Errorf("syntax error ('clear'): %+v", args)
+	}
+	s.clearTrails = true
+	return nil
+}
+
 func (s *Shell) executeEngineCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
@@ -148,6 +158,8 @@ func (s *Shell) executeEngineCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("Body pose: %s (target %s, limited by reach: %t)",
 		engine.BodyPose().String(), engine.TargetBodyPose().String(), engine.PoseLimited)
 	s.outputCh <- fmt.Sprintf("Max stride: %2.1f mm, reach: %2.1f mm, IK errors: %d", engine.MaxStride, engine.Reach, engine.IKErrors)
+	x, y, heading := engine.Odometry()
+	s.outputCh <- fmt.Sprintf("Travelled: x %2.1f mm, y %2.1f mm, heading %2.1f degrees", x, y, heading)
 	if engine.LastError != nil {
 		s.outputCh <- fmt.Sprintf("Last error: %v", engine.LastError)
 	}

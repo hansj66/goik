@@ -44,6 +44,7 @@ var helpSections = []helpSection{
 		"step_height <mm>                           - Height of the swing arc",
 		"speed <1-10>                               - Simulation speed (10 is real time)",
 		"engine                                     - Show the gait engine state",
+		"clear                                      - Clear the body path and foot trails in the XY view",
 	}},
 	{"pose", "Body pose (while standing or walking)", []string{
 		"pitch <deg>                                - Positive raises the front (+Y)",

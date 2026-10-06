@@ -83,6 +83,23 @@ func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 		0, 0, 0, 1,
 	})
 
+	// Ground plane: the world fixed grid at the height of the neutral feet
+	groundZ := 0.0
+	for _, l := range p.Legs {
+		groundZ += l.NeutralEffectorCoordinate.Z / float64(len(p.Legs))
+	}
+	project := func(x float64, y float64, z float64) [2]float32 {
+		return [2]float32{
+			float32(v.TranslateX(R_Iso.At(0, 0)*x + R_Iso.At(0, 1)*y + R_Iso.At(0, 2)*z)),
+			float32(v.TranslateY(R_Iso.At(2, 0)*x + R_Iso.At(2, 1)*y + R_Iso.At(2, 2)*z)),
+		}
+	}
+	var gridLines [][][2]float32
+	for _, l := range GroundGrid(p) {
+		gridLines = append(gridLines, [][2]float32{project(l[0][0], l[0][1], groundZ), project(l[1][0], l[1][1], groundZ)})
+	}
+	StrokePaths(Clip(screen, v.x, v.y, v.size), gridLines, 1, GridClr())
+
 	var IsoJoints = make([][robot.NUM_JOINTS]robot.Coordinate, p.BodyDefinition.NumLegs*robot.NUM_JOINTS)
 
 	for l := 0; l < p.BodyDefinition.NumLegs; l++ {

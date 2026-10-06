@@ -28,6 +28,7 @@ const window_size = 1024
 
 type Game struct {
 	views views.RenderViews
+	xy    *views.XyView
 	Shell *Shell
 }
 
@@ -35,7 +36,8 @@ func NewGame(s *Shell) *Game {
 	g := Game{Shell: s}
 
 	g.views = append(g.views, views.NewXzView(0, 0, window_size/2))
-	g.views = append(g.views, views.NewXyView(window_size/2, 0, window_size/2))
+	g.xy = views.NewXyView(window_size/2, 0, window_size/2)
+	g.views = append(g.views, g.xy)
 	g.views = append(g.views, views.NewIsoView(window_size/2, window_size/2, window_size/2))
 	g.views = append(g.views, views.NewGaitView(0, window_size/2, window_size/2))
 
@@ -69,6 +71,11 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	g.Shell.mu.Lock()
 	defer g.Shell.mu.Unlock()
+
+	if g.Shell.clearTrails {
+		g.xy.ClearTrails()
+		g.Shell.clearTrails = false
+	}
 
 	for _, v := range g.views {
 		v.Render(screen, g.Shell.Pod)

@@ -233,3 +233,44 @@ func TestGaitEngineIdleWithoutVelocity(t *testing.T) {
 		}
 	}
 }
+
+// Odometry and foot motion must agree: a grounded foot does not move in the world
+func TestOdometryKeepsGroundedFeetFixed(t *testing.T) {
+	p := NewPod(NewExampleHexapod1())
+	e, _ := NewGaitEngine(p)
+	p.Engine = e
+	e.SetTwist(Twist{X: 20, Y: 60, Yaw: 15})
+
+	type world struct{ x, y float64 }
+	previous := make([]*world, len(e.Legs))
+	checked := 0
+	for i := 0; i < int(6/ENGINE_DT); i++ {
+		p.Update()
+		for l, leg := range e.Legs {
+			if leg.Swinging {
+				previous[l] = nil
+				continue
+			}
+			x, y := e.GroundToWorld(leg.Foot.X, leg.Foot.Y)
+			if previous[l] != nil {
+				if d := math.Hypot(x-previous[l].x, y-previous[l].y); d > 1e-9 {
+					t.Fatalf("tick %d: grounded foot %d moved %g mm in the world", i, l, d)
+				}
+				checked++
+			}
+			previous[l] = &world{x, y}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no grounded feet were checked")
+	}
+
+	// 6 s along an arc: the pod has travelled and turned
+	x, y, heading := e.Odometry()
+	if math.Hypot(x, y) < 100 || heading < 30 {
+		t.Errorf("odometry = %f, %f, %f degrees; expected the pod to have travelled and turned", x, y, heading)
+	}
+	if gx, gy := e.WorldToGround(e.GroundToWorld(12, 34)); math.Abs(gx-12) > 1e-9 || math.Abs(gy-34) > 1e-9 {
+		t.Errorf("WorldToGround(GroundToWorld(12, 34)) = %f, %f", gx, gy)
+	}
+}
