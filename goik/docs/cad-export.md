@@ -14,10 +14,10 @@ any other CAD program) to check and refine the design, move its joints with the
 
 ```sh
 python cad/tools.py setup     # once: installs CadQuery in cad/.venv (Python 3.9 - 3.12)
-python cad/tools.py vendor    # vendor servo models (see servo-models.md)
+python cad/tools.py check     # optional: shows what is installed (the vendor servo models are included)
 ```
 
-Or `make cad-setup` and `make cad-vendor`. Then in the simulator:
+Or `make cad-setup` and `make cad-check`. Then in the simulator:
 
 ```
 >reset 6                      # example hexapod designed for AX-12A servos

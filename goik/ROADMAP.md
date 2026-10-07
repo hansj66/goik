@@ -10,7 +10,7 @@
     1. (done) Per joint mounting parameters: `servo ... case <deg>` and `servo ... axis_offset <mm>`
     1. (done) Simple solids: base plate, placeholder rods and ball feet. To be replaced by printable brackets (next item)
     1. (done) Convert coordinates: GOIK has +Z towards the ground, CAD expects Z up (rotate 180 degrees around X, keeping the frame right-handed)
-    1. (done) Vendor STEP files are not committed (no licence or redistribution statement found). [docs/servo-models.md](docs/servo-models.md) lists where to download them (`goik/cad/vendor/`, ignored by git)
+    1. (done) Vendor STEP files are included in `cad/vendor/`, with their sources and owners in `cad/vendor/NOTICE.md` (no licence or redistribution statement was found: remove a file if a rights holder asks). [docs/servo-models.md](docs/servo-models.md) lists where they came from
     1. (done) Example pod 6 (`reset 6`) designed around the AX-12A: no colliding servos
     1. (done) Collision check between all parts in the export (see the printable brackets item)
 1. Printable brackets, so the CAD export can be printed directly. Status October 2026: first version for the AX-12A and STS3215 in `cad/brackets.py` (see [docs/cad-export.md](docs/cad-export.md))

@@ -14,9 +14,8 @@ model.
 
 ## Vendor models
 
-The vendor models are **not included in this repository**: no licence or redistribution statement was found for them
-(checked October 2026), so they may be downloaded and used, but not redistributed. They go in `goik/cad/vendor/`
-(ignored by git), named after the servo model:
+The vendor models are included in `goik/cad/vendor/`, named after the servo model, so the CAD export works out of
+the box:
 
 ```
 goik/cad/vendor/AX-12A.step
@@ -24,8 +23,10 @@ goik/cad/vendor/XL-320.step
 goik/cad/vendor/STS3215.step
 ```
 
-`python cad/tools.py vendor` downloads the ones that can be downloaded, and explains how to get the others. Without a
-vendor model, the export uses a box with a horn instead.
+They belong to their manufacturers and are not covered by this repository's licence: see
+[cad/vendor/NOTICE.md](../cad/vendor/NOTICE.md). The links below are where they came from, for replacing a file with a
+newer version (measure it again afterwards, see below). `python cad/tools.py vendor` downloads any that are missing,
+where that can be done automatically. Without a vendor model, the export uses a box with a horn instead.
 
 ### Where to download
 
@@ -77,6 +78,6 @@ Only XL-320 has no mounting features yet, so it gets placeholder parts in the ex
 
 ## Licensing
 
-If a vendor gives explicit permission to redistribute their files, they could be committed in a separate folder
-together with the source and terms, kept outside the Apache 2.0 licence of this repository. Until then, keep them
-local.
+No licence or redistribution statement was found for the vendor models (checked October 2026). They are included for
+convenience, kept apart from the code in `cad/vendor/` with their sources in
+[NOTICE.md](../cad/vendor/NOTICE.md), and will be removed if a rights holder asks.

@@ -1,0 +1,3 @@
+# Vendor servo models: keep them byte for byte (their SHA-256 checksums are recorded in goik/cad/servos.json)
+*.step -text
+*.stp -text
