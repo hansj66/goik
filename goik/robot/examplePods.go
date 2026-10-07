@@ -165,3 +165,32 @@ func NewSpider() *BodyDefinition {
 
 	return b
 }
+
+// Example hexapod designed around real AX-12A servos (32 x 50 x 32 mm cases, see cad/servos.json).
+// The coxa mounts are far enough from the centre for the six coxa servo cases to fit. The coxa is
+// long enough (60 mm) for the femur servo and its mounting to stay clear of the coxa servo's corners
+// at any coxa angle, and the femur clears the tibia servo. The rest pose puts the feet 90 mm outside
+// the femur joints and 110 mm below the body. The CAD export (export_cad) of this pod, including
+// the printable brackets, has no collisions.
+func NewExampleHexapodAX12() *BodyDefinition {
+	gait, _ := NewHexapodGait(TRIPOD)
+	b := &BodyDefinition{
+		NumLegs:    6,
+		CoxaAngles: []float64{0, 60, 120, 180, 240, 300},
+		Gait:       gait,
+	}
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{80, 0, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{40, 69.28, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{-40, 69.28, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{-80, 0, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{-40, -69.28, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{40, -69.28, 0})
+
+	for i := 0; i < b.NumLegs; i++ {
+		b.RestAngles = append(b.RestAngles, ServoAngles{Coxa: 0, Femur: -15, Tibia: 97})
+		b.Segments = append(b.Segments, SegmentLengths{Coxa: 60, Femur: 75, Tibia: 130})
+	}
+	b.Servos = NewDefaultServoMapping(b.NumLegs)
+
+	return b
+}

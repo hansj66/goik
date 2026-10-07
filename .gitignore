@@ -4,3 +4,8 @@
 
 # Vendor CAD files are downloaded locally and not redistributed (see goik/CAD_FILES.md)
 /goik/cad/vendor/
+
+# CAD export: Python environment and generated models
+/goik/cad/.venv/
+/goik/cad/out/
+__pycache__/

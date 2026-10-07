@@ -239,7 +239,7 @@ func (s *Shell) executeResetCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
 	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('reset <0-5>'): %+v", args)
+		return fmt.Errorf("syntax error ('reset <0-6>'): %+v", args)
 	}
 
 	s.stopScript()
@@ -256,6 +256,8 @@ func (s *Shell) executeResetCmd(args []string) error {
 		s.Pod = robot.NewPod(robot.NewHeptapod())
 	} else if args[1] == "5" {
 		s.Pod = robot.NewPod(robot.NewSpider())
+	} else if args[1] == "6" {
+		s.Pod = robot.NewPod(robot.NewExampleHexapodAX12())
 	} else {
 		return fmt.Errorf("Unknown example preset")
 	}

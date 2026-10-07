@@ -19,6 +19,7 @@ A description of the forward and inverse kinematics equations used can be found 
 ## Building the simulator
 
 The simulator is written in Go. If you don't have Go installed on your machine, you can download it from [here](https://go.dev/).
+Some platforms need extra packages for [Ebitengine](https://ebitengine.org/en/documents/install.html), the 2D engine used for the views.
 
 Navigate to the goik/goik folder and type:
 
@@ -26,7 +27,31 @@ Navigate to the goik/goik folder and type:
 >go build
 ```
 
-This will create an executablecalled "GOIK.exe" on windows or a GOIK executable on Mac.
+This will create an executable called "GOIK.exe" on Windows or "GOIK" on Mac and Linux. Run it from the goik/goik
+folder, since it looks for `scripts`, `pods`, `primitives` and `cad` relative to the current folder.
+
+### Make targets
+
+The goik/goik folder has a Makefile with shortcuts. Make is optional: every target is a single command that can also be
+typed directly.
+
+| Target | Command | Does |
+|---|---|---|
+| `make build` | `go build` | Build the simulator |
+| `make test` | `go test ./...` | Run the tests |
+| `make run` | `go run .` | Build and start the simulator |
+| `make cad-setup` | `python cad/tools.py setup` | Install CadQuery in `cad/.venv`, needed for the CAD export (Python 3.9 - 3.12) |
+| `make cad-vendor` | `python cad/tools.py vendor` | Download the vendor servo models that can be downloaded, and explain the others |
+| `make cad-check` | `python cad/tools.py check` | Show what is installed, downloaded and measured for the CAD export |
+
+Use another Python for the CAD targets with `make cad-setup PYTHON=python3`. See [CAD_FILES.md](./goik/CAD_FILES.md)
+for the CAD export.
+
+Installing make:
+
+* Windows: `winget install ezwinports.make` (open a new terminal afterwards, so the updated PATH is picked up)
+* Mac: `xcode-select --install` (the Xcode command line tools include make)
+* Linux: usually installed already, otherwise install the `make` package (for example `sudo apt install make`)
 
 ## Usage
 
@@ -95,6 +120,14 @@ halt                       # step back into the neutral stance
 Servo ids, orientation, offsets, soft limits and the servo model (AX-12A, STS3215, XL-320) are part of the pod
 definition and are saved with `save`. Use `servos` to show the mapping, and `servo` / `servo_model` to change it.
 The mapping is used when exporting recordings, and will be used by the robot controller.
+
+### CAD export
+
+`export_cad <name>` exports the pod in its rest pose as a STEP assembly (and STL): a servo at every joint in the right
+place and orientation, a base plate for the coxa servos, and placeholder links and feet. Import it in Fusion 360 or any
+other CAD program as a starting point for printable parts. Example pod 6 (`reset 6`) is designed around AX-12A servos.
+The STEP file is built with [CadQuery](https://cadquery.readthedocs.io/) (`python goik/cad/tools.py setup` installs it).
+See [CAD_FILES.md](./goik/CAD_FILES.md) for the details, including where to download vendor servo models.
 
 The simulator allows for loading & saving of pods as well as recording of motion sequences (`record on`) and exporting them (`export`) as raw servo positions.
 

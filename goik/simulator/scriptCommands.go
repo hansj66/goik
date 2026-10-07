@@ -133,6 +133,12 @@ func (s *Shell) executeServosCmd(args []string) error {
 			if j.Min != 0 || j.Max != 0 {
 				line += fmt.Sprintf(" [%2.0f, %2.0f]", j.Min, j.Max)
 			}
+			if j.CaseAngle != 0 {
+				line += fmt.Sprintf(" case %2.0f", j.CaseAngle)
+			}
+			if j.AxisOffset != 0 {
+				line += fmt.Sprintf(" axis %2.1f", j.AxisOffset)
+			}
 		}
 		s.outputCh <- line
 	}
@@ -154,7 +160,7 @@ func (s *Shell) executeServoModelCmd(args []string) error {
 
 func (s *Shell) executeServoCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
-	usage := fmt.Errorf("syntax error ('servo <ALL | legNum> <coxa|femur|tibia> id <n> | invert <on|off> | offset <deg> | limits <min> <max>'): %+v", args)
+	usage := fmt.Errorf("syntax error ('servo <ALL | legNum> <coxa|femur|tibia> id <n> | invert <on|off> | offset <deg> | limits <min> <max> | case <deg> | axis_offset <mm>'): %+v", args)
 
 	if len(args) < 5 {
 		return usage
@@ -214,6 +220,18 @@ func (s *Shell) executeServoCmd(args []string) error {
 				return usage
 			}
 			j.Min, j.Max = min, max
+		case "case":
+			angle, err := strconv.ParseFloat(args[4], 64)
+			if err != nil || len(args) != 5 {
+				return usage
+			}
+			j.CaseAngle = angle
+		case "axis_offset":
+			offset, err := strconv.ParseFloat(args[4], 64)
+			if err != nil || len(args) != 5 {
+				return usage
+			}
+			j.AxisOffset = offset
 		default:
 			return usage
 		}

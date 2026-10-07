@@ -69,6 +69,11 @@ type JointMapping struct {
 	// Soft limits in degrees (after offset and inversion). Both 0 means the full servo range
 	Min float64 `json:"Min"`
 	Max float64 `json:"Max"`
+	// CAD export: rotation (degrees) of the servo case around the joint axis. At 0 the case extends
+	// back along the link the servo is mounted on (towards the previous joint, or the body for the coxa)
+	CaseAngle float64 `json:"CaseAngle,omitempty"`
+	// CAD export: distance (mm) from the joint origin to the horn face, along the horn direction
+	AxisOffset float64 `json:"AxisOffset,omitempty"`
 }
 
 // LegMapping maps the joints of a leg to physical servos

@@ -92,6 +92,17 @@ func (l *Leg) GetJointOrigin(H *mat.Dense) Coordinate {
 func (l *Leg) RecalculateForwardKinematics(angles ServoAngles) {
 	l.ServoAngles = angles
 
+	H0_1, H1_2, H2_3 := l.transforms(angles)
+
+	l.Joints[COXA_ORIGIN_INDEX] = l.GetJointOrigin(l.OffsetTransformationMatrix)
+	l.Joints[FEMUR_ORIGIN_INDEX] = l.GetJointOrigin(H0_1)
+	l.Joints[TIBIA_ORIGIN_INDEX] = l.GetJointOrigin(H1_2)
+	l.Joints[EFFECTOR_ORIGIN_INDEX] = l.GetJointOrigin(H2_3)
+}
+
+// transforms returns the homogeneous transformation matrices from the base reference frame to
+// the femur origin (H0_1), the tibia origin (H1_2) and the end effector (H2_3)
+func (l *Leg) transforms(angles ServoAngles) (*mat.Dense, *mat.Dense, *mat.Dense) {
 	P_Femur := mat.NewDense(3, 3, []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}) // Identity
 	P_Coxa := mat.NewDense(3, 3, []float64{1, 0, 0, 0, 0, -1, 0, 1, 0})
 	P_Tibia := mat.NewDense(3, 3, []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}) // Identity
@@ -107,11 +118,16 @@ func (l *Leg) RecalculateForwardKinematics(angles ServoAngles) {
 	H0_1.Mul(l.OffsetTransformationMatrix, H_Coxa)
 	H1_2.Mul(&H0_1, H_Femur)
 	H2_3.Mul(&H1_2, H_Tibia)
+	return &H0_1, &H1_2, &H2_3
+}
 
-	l.Joints[COXA_ORIGIN_INDEX] = l.GetJointOrigin(l.OffsetTransformationMatrix)
-	l.Joints[FEMUR_ORIGIN_INDEX] = l.GetJointOrigin(&H0_1)
-	l.Joints[TIBIA_ORIGIN_INDEX] = l.GetJointOrigin(&H1_2)
-	l.Joints[EFFECTOR_ORIGIN_INDEX] = l.GetJointOrigin(&H2_3)
+// ServoFrames returns the reference frames the coxa, femur and tibia servos are mounted in (base
+// reference frame, current angles). Each frame's origin is on its joint and its Z axis is the joint's
+// rotation axis. The servo case is fixed in the frame, and its horn turns around Z by the joint angle.
+// X points along the link the servo is mounted on (for the coxa servo: along the leg at coxa angle 0).
+func (l *Leg) ServoFrames() [NUM_JOINTS - 1]*mat.Dense {
+	H0_1, H1_2, _ := l.transforms(l.ServoAngles)
+	return [NUM_JOINTS - 1]*mat.Dense{mat.DenseCopyOf(l.OffsetTransformationMatrix), H0_1, H1_2}
 }
 
 // NewLeg returns a new leg

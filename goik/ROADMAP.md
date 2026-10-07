@@ -3,15 +3,24 @@
 ## R & D / TODO
 
 1. Script / interpreter functionality for composing walking sequences / motion primitives / moves
-1. Full hexapod step file generation (with input of servo step files)
-    1. Export an assembly description (JSON) from GOIK: per leg and joint the servo model, full transform from forward kinematics, horn direction (from the servo mapping's Inverted flag), link lengths and coxa mount points. The pod is exported in its rest pose
-    1. CadQuery (or build123d) script in the repo that reads the JSON plus the vendor STEP files, places a servo at every joint, and exports a STEP assembly (and STL). STEP is too complex to write directly from Go. A FreeCAD macro is an alternative for opening the result in FreeCAD
-    1. Per servo model mount data (AX-12A, STS3215, XL-320): horn axis position and direction, and horn face offset, relative to the vendor STEP file's origin. Measured once per model and stored with the servo models
-    1. Per joint mounting parameters with sensible defaults: rotation of the servo case around its own axis, and which side of the joint it sits on
-    1. Simple solids: base plate (outline around the coxa mounts plus a margin, configurable thickness), placeholder brackets with the correct length between joint axes, tibia rod with a ball foot. A starting point for designing printable parts
-    1. Convert coordinates: GOIK has +Z towards the ground, CAD expects Z up (rotate 180 degrees around X, keeping the frame right-handed)
-    1. Vendor STEP files are not committed (no licence or redistribution statement found). [CAD_FILES.md](CAD_FILES.md) lists where to download them and where to put them (`goik/cad/vendor/`, ignored by git). Record which file the mount data was measured on (name, date, SHA-256)
-    1. Later: simple collision check between legs, and between legs and the body, using the same geometry
+1. Full hexapod step file generation (with input of servo step files). Status October 2026: working, see [CAD_FILES.md](CAD_FILES.md) (`export_cad`, `cad/goik_cad.py`, `cad/tools.py`)
+    1. (done) Export an assembly description (JSON) from GOIK: per leg and joint the servo model, full transform from forward kinematics, horn direction (from the servo mapping's Inverted flag), link lengths and coxa mount points. The pod is exported in its rest pose
+    1. (done) CadQuery script in the repo that reads the JSON plus the vendor STEP files, places a servo at every joint, and exports a STEP assembly (vendor models stored once and instanced) and one STL per printable part
+    1. (done) Per servo model mount data for the AX-12A, XL-320 and STS3215, measured with `python cad/tools.py measure` on the vendor models and stored in `cad/servos.json`
+    1. (done) Per joint mounting parameters: `servo ... case <deg>` and `servo ... axis_offset <mm>`
+    1. (done) Simple solids: base plate, placeholder rods and ball feet. To be replaced by printable brackets (next item)
+    1. (done) Convert coordinates: GOIK has +Z towards the ground, CAD expects Z up (rotate 180 degrees around X, keeping the frame right-handed)
+    1. (done) Vendor STEP files are not committed (no licence or redistribution statement found). [CAD_FILES.md](CAD_FILES.md) lists where to download them (`goik/cad/vendor/`, ignored by git)
+    1. (done) Example pod 6 (`reset 6`) designed around the AX-12A: no colliding servos
+    1. (done) Collision check between all parts in the export (see the printable brackets item)
+1. Printable brackets, so the CAD export can be printed directly. Status October 2026: first version for the AX-12A in `cad/brackets.py` (see CAD_FILES.md)
+    1. Decisions: our own brackets for every supported servo model (no ROBOTIS frames or other third party brackets). No heat-set inserts: screws go through clearance holes or into slightly undersized holes in the plastic. Validate in Fusion 360 as early as possible
+    1. (done for the AX-12A) Mounting features in servos.json: horn screw circle (4 x M2 on 16 mm), idler hub, case holes. Measured on the ROBOTIS model by surveying its circular features. TODO: the same for the STS3215 and XL-320, and teach `cad/tools.py measure` to report them
+    1. (done) Parametric parts from the GOIK lengths, with every joint axis where the kinematics expect it: body plates on both coxa case faces, coxa bracket (arms on horn and idler, side plates on the femur servo case), femur bracket in two halves, tibia with a foot. Example pod 6 (coxa now 60 mm) has no collisions
+    1. (done) Collision check of all parts in the rest pose. TODO: check over the joint ranges (sweep each joint), and between neighbouring legs
+    1. TODO: validate in Fusion 360 and with a test print: screw access, idler attachment (the idler hub's centre screw), print orientation and supports per part, part strength (tibia beam 12 x 10 mm)
+    1. TODO: per part print orientation in the STL export (currently each part lies in its own frame on Z = 0)
+    1. Open question: printer, material and bed size (FDM with PLA or PETG?). The body plates of pod 6 are about 230 mm across
 1. Improve visualization
     1. Footfall diagram (scrolling swing/stance timeline per leg) instead of the static gait pattern table, which shows the target gait and is wrong during transitions
     1. Phase dials: each leg's current phase compared to the phase its gait wants (shows legs re-timing during gait transitions)

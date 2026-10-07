@@ -1,0 +1,58 @@
+{
+  "_comment": [
+    "Servo geometry for the CAD export, in the servo frame used by goik_cad.py:",
+    "origin on the horn axis at the outer face of the horn, +Z out of the horn, case extending along -X.",
+    "case: length (along X), width (along Y), depth (along Z, behind the horn), axis_from_end (horn axis to the near end of the case).",
+    "vendor_step: optional vendor model in cad/vendor/. 'transform' maps the vendor file's coordinates to the servo frame",
+    "(row major 4x4). While it is null, the simple case + horn geometry is used. See CAD_FILES.md."
+  ],
+  "AX-12A": {
+    "source": "Measured on the ROBOTIS AX-12 model (python cad/tools.py measure and a survey of its features), matching the ROBOTIS drawing: case 32 x 50 mm, 32 mm thick, horn diameter 22 mm standing 5.7 mm proud of the case, horn axis centred and 11.5 mm from the near end, idler hub on the other side 3 mm proud",
+    "verified": true,
+    "case": {"length": 50, "width": 32, "depth": 32, "axis_from_end": 11.5},
+    "horn": {"diameter": 22, "thickness": 5.7},
+    "mounting": {
+      "_comment": "Servo frame coordinates (origin on the horn face, +Z out of the horn, case along -X). Used for the printable brackets",
+      "mid_plane": -21.7,
+      "case_faces": [-5.7, -37.7],
+      "idler_face": -40.7,
+      "idler_boss_diameter": 11.5,
+      "idler_screw_clearance": 3.4,
+      "horn_screws": [[8, 0], [-8, 0], [0, 8], [0, -8]],
+      "horn_centre_clearance": 8.6,
+      "case_holes": [[-6.5, 13.5], [-6.5, -13.5], [-14.5, 13.5], [-14.5, -13.5], [-22.5, 13.5], [-22.5, -13.5], [-30.5, 13.5], [-30.5, -13.5], [-36, 8], [-36, -8]],
+      "screw_clearance": 2.4
+    },
+    "vendor_step": {
+      "file": "AX-12A.step",
+      "page": "https://en.robotis.com/service/downloadpage.php?ca_id=70 (entry AX-12A / AX-18A / AX-12W / MX-12W, STEP)",
+      "sha256": "0178185b6dc62ecf4355784a0f48de2f939dc2f6c763e050671d1b15546b173f",
+      "transform": [[0.0, 1.0, 0.0, 0.0], [-1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, -21.7], [0.0, 0.0, 0.0, 1.0]]
+    }
+  },
+  "XL-320": {
+    "source": "Measured on the ROBOTIS XL-320.step (python cad/tools.py measure): case 24 x 36 mm, 27 mm deep including the 3 mm horn, horn diameter 17.8 mm, horn axis centred across the width and 9 mm from the near end",
+    "verified": true,
+    "case": {"length": 36, "width": 24, "depth": 24, "axis_from_end": 9},
+    "horn": {"diameter": 17.8, "thickness": 3},
+    "vendor_step": {
+      "file": "XL-320.step",
+      "page": "https://en.robotis.com/service/downloadpage.php?ca_id=70 (entry XL-320, STEP)",
+      "sha256": "70a83aa5f67b34047d21fb7110205ef18a38e41537c687bdef67ed45e298002d",
+      "transform": [[0.0, 1.0, 0.0, 0.0], [-1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, -15.0], [0.0, 0.0, 0.0, 1.0]]
+    }
+  },
+  "STS3215": {
+    "source": "Measured on Waveshare's ST3215.step (python cad/tools.py measure): case 45.22 x 24.72 mm, 35 mm deep, horn diameter 18.8 mm, horn axis 10.11 mm from the near end. Overall depth 37.8 mm including the horn",
+    "verified": true,
+    "case": {"length": 45.22, "width": 24.72, "depth": 35, "axis_from_end": 10.11},
+    "horn": {"diameter": 18.8, "thickness": 2.8},
+    "vendor_step": {
+      "file": "STS3215.step",
+      "page": "https://www.waveshare.com/wiki/ST3215_Servo",
+      "download": {"url": "https://files.waveshare.com/upload/5/59/ST3215-3D.zip", "zip_member": "ST3215.step"},
+      "sha256": "58e38e4dc49f97df738c5f229f9aa8a7dce64a0a1d01335486a52d53e6017e8a",
+      "transform": [[-1.0, 0.0, 0.0, -25.5], [0.0, 0.0, 1.0, 0.0], [0.0, 1.0, 0.0, -9.6], [0.0, 0.0, 0.0, 1.0]]
+    }
+  }
+}

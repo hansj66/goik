@@ -27,7 +27,7 @@ type helpSection struct {
 
 var helpSections = []helpSection{
 	{"design", "Pod design", []string{
-		"reset <0-5>                                - Load example pod <n>",
+		"reset <0-6>                                - Load example pod <n> (6: designed for AX-12A servos)",
 		"save <filename> / load <filename>          - Save / load the pod definition (including servo mapping)",
 		"set_coxa_length <ALL | legNum> <length>    - Also set_femur_length and set_tibia_length",
 		"set_coxa_angle <ALL | legNum> <angle>      - Rest angle. Also set_femur_angle and set_tibia_angle",
@@ -59,12 +59,15 @@ var helpSections = []helpSection{
 		"abort                                      - Abort the running script and halt",
 		"scripts                                    - List scripts",
 	}},
-	{"servos", "Servos and recording", []string{
+	{"servos", "Servos, recording and CAD export", []string{
 		"servos                                     - Show the servo mapping",
-		"servo_model <AX-12A | STS3215 | XL-320>    - Select the servo type",
+		"servo_model <AX-12A | STS3215 | XL-320>    - Select the servo type (default AX-12A)",
 		"servo <ALL | legNum> <coxa|femur|tibia> id <n> | invert <on|off> | offset <deg> | limits <min> <max>",
+		"                                             | case <deg> | axis_offset <mm>   (CAD: servo case rotation and horn offset)",
 		"record <on|off>                            - Record servo angles while moving (off discards)",
 		"export <file>                              - Save the recording, using the servo mapping",
+		"export_cad <name>                          - Export the pod in its rest pose to cad/out/<name>.json, and build",
+		"                                             <name>.step and .stl with CadQuery (see CAD_FILES.md)",
 	}},
 }
 

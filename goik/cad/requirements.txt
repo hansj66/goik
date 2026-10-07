@@ -1,0 +1,2 @@
+# CAD export dependencies (python cad/tools.py setup)
+cadquery==2.8.0

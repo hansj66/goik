@@ -77,6 +77,7 @@ func NewShell(pod *robot.Pod) *Shell {
 		"swing_time":       s.executeSwingTimeCmd,
 		"engine":           s.executeEngineCmd,
 		"clear":            s.executeClearCmd,
+		"export_cad":       s.executeExportCadCmd,
 		"step_height":      s.executeStepHeightCmd,
 		"pitch":            s.executePoseCmd,
 		"roll":             s.executePoseCmd,
