@@ -41,7 +41,7 @@ type SegmentLengths struct {
 type Leg struct {
 	// Leg index is displayed in the simualtor views and
 	// is also used to calculate the servo ID representing
-	// a specific joint (please refer to the README.md file
+	// a specific joint (please refer to docs/servos.md
 	// for the numbering convention used).
 	Index int
 	// The robot legs are arranged around the body of the robot

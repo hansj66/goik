@@ -16,7 +16,7 @@
 
     python cad/tools.py setup              create cad/.venv and install CadQuery (cad/requirements.txt)
     python cad/tools.py vendor             download the vendor STEP files that can be downloaded automatically,
-                                           and explain how to get the others (see CAD_FILES.md)
+                                           and explain how to get the others (see docs/servo-models.md)
     python cad/tools.py check              show what is installed, downloaded and measured
     python cad/tools.py measure <file>     suggest the mount transform for a vendor STEP file (servos.json)
 
@@ -98,7 +98,7 @@ def vendor():
 
         download = step.get("download")
         if not download:
-            print(f"{model}: download it manually from {step.get('page', 'the vendor (see CAD_FILES.md)')}")
+            print(f"{model}: download it manually from {step.get('page', 'the vendor (see docs/servo-models.md)')}")
             print(f"    and save it as {path}")
             continue
 

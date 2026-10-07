@@ -4,7 +4,7 @@
     "origin on the horn axis at the outer face of the horn, +Z out of the horn, case extending along -X.",
     "case: length (along X), width (along Y), depth (along Z, behind the horn), axis_from_end (horn axis to the near end of the case).",
     "vendor_step: optional vendor model in cad/vendor/. 'transform' maps the vendor file's coordinates to the servo frame",
-    "(row major 4x4). While it is null, the simple case + horn geometry is used. See CAD_FILES.md."
+    "(row major 4x4). While it is null, the simple case + horn geometry is used. See docs/servo-models.md."
   ],
   "AX-12A": {
     "source": "Measured on the ROBOTIS AX-12 model (python cad/tools.py measure and a survey of its features), matching the ROBOTIS drawing: case 32 x 50 mm, 32 mm thick, horn diameter 22 mm standing 5.7 mm proud of the case, horn axis centred and 11.5 mm from the near end, idler hub on the other side 3 mm proud",

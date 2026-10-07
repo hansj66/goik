@@ -4,7 +4,7 @@ This is a tool for simulating and designing hexapods, octopods, or any pod you c
 
 Any leg orientations is ok, any number of legs is ok, any combination of coxa, femur and tibia lenghts is ok. You can even mix and match with different style legs and leg anchor points and orientations on the same pod, since the kinematics equations are generic.
 
-Hexapods can use tripod, ripple and wave gait. Pods with a different number of limbs are so far limited to wave gait. (Gait transitions are)
+Hexapods can use tripod, ripple and wave gait. Pods with a different number of limbs are so far limited to wave gait. Gait transitions are smooth, and happen mid-stride while the pod walks.
 
 I decided to make this tool to be able to iterate faster when designing my own hexapods.
 
@@ -12,9 +12,23 @@ I decided to make this tool to be able to iterate faster when designing my own h
 
 It has so far been tested on Mac and Windows
 
-## Kinematics
+## Documentation
 
-A description of the forward and inverse kinematics equations used can be found [here](./goik/README.md) along with some info on how to interface Dynamixel servos. The code is servo agnostic. Servo ids, orientation and range are defined in the servo mapping (see below). The target robot controller is the Raspberry Pi CM5 based [Overlord](https://github.com/hansj66/overlord) board.
+| Document | About |
+|---|---|
+| [Using the simulator](./goik/docs/simulator.md) | The views, the example pods and all shell commands |
+| [The gait engine](./goik/docs/gait-engine.md) | How walking, gait transitions and the body pose work |
+| [Motion scripts](./goik/docs/scripts.md) | Chaining walks, turns, gait changes and poses in a script |
+| [Servos](./goik/docs/servos.md) | Servo mapping, servo models, recording, and Dynamixel hardware |
+| [CAD export](./goik/docs/cad-export.md) | Exporting a pod as a STEP assembly with printable brackets |
+| [Joints in Fusion 360](./goik/docs/fusion-joints.md) | Moving the joints of an export in Fusion 360 |
+| [Servo models](./goik/docs/servo-models.md) | Servo geometry and vendor models for the CAD export |
+| [Kinematics](./goik/docs/kinematics.md) | Forward and inverse kinematics, and gait patterns |
+| [Design notes](./goik/docs/design-notes.md) | Motion chaining and the Overlord robot controller (plans) |
+
+The code is servo agnostic: servo ids, orientation and range are defined in the servo mapping. The target robot
+controller is the Raspberry Pi CM5 based [Overlord](https://github.com/hansj66/overlord) board. What's next is in the
+[roadmap](./goik/ROADMAP.md), known bugs in [BUGS.md](./goik/BUGS.md).
 
 ## Building the simulator
 
@@ -44,8 +58,8 @@ typed directly.
 | `make cad-vendor` | `python cad/tools.py vendor` | Download the vendor servo models that can be downloaded, and explain the others |
 | `make cad-check` | `python cad/tools.py check` | Show what is installed, downloaded and measured for the CAD export |
 
-Use another Python for the CAD targets with `make cad-setup PYTHON=python3`. See [CAD_FILES.md](./goik/CAD_FILES.md)
-for the CAD export.
+Use another Python for the CAD targets with `make cad-setup PYTHON=python3`. See the
+[CAD export](./goik/docs/cad-export.md) documentation.
 
 Installing make:
 
@@ -57,7 +71,7 @@ Installing make:
 
 GOIK will open a command shell and a graphical XZ/XY and isometric view along with a visualization of the current gait pattern
 
-Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 6 different preloaded models (`reset 0` to `reset 5`) that can be played with to get a feel for the simulator.
+Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 7 different preloaded models (`reset 0` to `reset 6`) that can be played with to get a feel for the simulator. See [Using the simulator](./goik/docs/simulator.md) for all commands.
 
 ### Example session
 
@@ -91,7 +105,7 @@ Type `help` in the command shell to get a list of commands, or `help <section>` 
 
 The `walk` command drives a phase based gait engine. Velocity, direction, gait and body pose (`pitch`, `roll`, `yaw`,
 `up`, `down`, `shift`, `level`) can be changed at any time, and the pod transitions smoothly
-(see [MOTION_CHAINING.md](./goik/MOTION_CHAINING.md)). `halt` steps back into the neutral stance:
+(see [the gait engine](./goik/docs/gait-engine.md)). `halt` steps back into the neutral stance:
 
 ```sh
 >reset 1
@@ -102,8 +116,8 @@ The `walk` command drives a phase based gait engine. Velocity, direction, gait a
 >halt
 ```
 
-Sequences of motions can be written as scripts in the `goik/scripts` folder and played with `run <name>`
-(`scripts` lists them, `abort` stops the running script). See [demo.goik](./goik/scripts/demo.goik):
+Sequences of motions can be written as [scripts](./goik/docs/scripts.md) in the `goik/scripts` folder and played
+with `run <name>` (`scripts` lists them, `abort` stops the running script). See [demo.goik](./goik/scripts/demo.goik):
 
 ```sh
 gait tripod
@@ -119,22 +133,25 @@ halt                       # step back into the neutral stance
 
 Servo ids, orientation, offsets, soft limits and the servo model (AX-12A, STS3215, XL-320) are part of the pod
 definition and are saved with `save`. Use `servos` to show the mapping, and `servo` / `servo_model` to change it.
-The mapping is used when exporting recordings, and will be used by the robot controller.
+The mapping is used when exporting recordings, and will be used by the robot controller. See [Servos](./goik/docs/servos.md).
 
 ### CAD export
 
-`export_cad <name>` exports the pod in its rest pose as a STEP assembly (and STL): a servo at every joint in the right
-place and orientation, a base plate for the coxa servos, and placeholder links and feet. Import it in Fusion 360 or any
-other CAD program as a starting point for printable parts. Example pod 6 (`reset 6`) is designed around AX-12A servos.
-The STEP file is built with [CadQuery](https://cadquery.readthedocs.io/) (`python goik/cad/tools.py setup` installs it).
-See [CAD_FILES.md](./goik/CAD_FILES.md) for the details, including where to download vendor servo models.
+`export_cad <name>` exports the pod in its rest pose as a STEP assembly: a servo at every joint in the right place
+and orientation, connected by printable brackets, plus one STL per printable part. Open it in Fusion 360 or any other
+CAD program, and move its joints in Fusion with the [GOIK_Joints script](./goik/docs/fusion-joints.md). Example pod 6
+(`reset 6`) is designed around AX-12A servos. The STEP file is built with [CadQuery](https://cadquery.readthedocs.io/)
+(`make cad-setup` installs it). See [CAD export](./goik/docs/cad-export.md) for the details, and
+[Servo models](./goik/docs/servo-models.md) for where to download the vendor servo models.
+
+![Example pod 6 exported with export_cad, in Fusion 360](./goik/pictures/example_cad_export.png)
 
 The simulator allows for loading & saving of pods as well as recording of motion sequences (`record on`) and exporting them (`export`) as raw servo positions.
 
 
 ## Experimental stuff
 
-Recording and exporting motion primitives (`record` / `export`) is _experimental_. Earlier versions also streamed servo positions over UDP to an ESP32 based controller. That has been removed in favour of running the gait engine directly on the [Overlord](https://github.com/hansj66/overlord) controller (see [MOTION_CHAINING.md](./goik/MOTION_CHAINING.md)).
+Recording and exporting motion primitives (`record` / `export`) is _experimental_. Earlier versions also streamed servo positions over UDP to an ESP32 based controller. That has been removed in favour of running the gait engine directly on the [Overlord](https://github.com/hansj66/overlord) controller (see the [design notes](./goik/docs/design-notes.md)).
 
 ## Future work
 

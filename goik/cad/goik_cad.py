@@ -23,8 +23,10 @@ For servo models with mounting features in servos.json, the pod gets printable p
 body plates, coxa and femur brackets and tibias. Other models get a placeholder base plate, rods and
 ball feet. All parts are checked for collisions in the exported (rest) pose. Units are mm, Z up.
 
-Outputs: <name>.step (the assembly; every servo model is stored once and instanced), and one STL per
-printable part in <name>_stl/, each in its own frame lying on Z = 0 (servos are left out).
+Outputs: <name>.step (the assembly; every servo model is stored once and instanced), one STL per
+printable part in <name>_stl/, each in its own frame lying on Z = 0 (servos are left out), and
+<name>_joints.json: the parts that move together and the revolute joints between them, for the
+Fusion 360 script in cad/fusion (STEP files don't carry joints into Fusion).
 
     python goik_cad.py ../cad/out/hexapod.json -o ../cad/out
 """
@@ -121,6 +123,58 @@ def print_frame(part, frame):
     m = np.linalg.inv(np.array(frame, dtype=float))
     shape = part.val().moved(location(m.tolist()))
     return cq.Workplane(obj=shape.moved(cq.Location(cq.Vector(0, 0, -shape.BoundingBox().zmin))))
+
+
+def part_group(name):
+    """The group of parts that move together: the body, or the coxa, femur or tibia link of a leg.
+
+    A servo's case belongs to the link it is mounted on (the coxa servos to the body)."""
+    if not name.startswith("leg"):
+        return "body"
+    leg, rest = name.split("_", 1)
+    for servo, group in (("coxa_servo", "body"), ("femur_servo", f"{leg}_coxa"), ("tibia_servo", f"{leg}_femur")):
+        if rest.startswith(servo):
+            return group
+    for link in ("coxa", "femur", "tibia"):
+        if rest.startswith(link):
+            return f"{leg}_{link}"
+    if rest.startswith("foot"):
+        return f"{leg}_tibia"
+    raise ValueError(f"no group for part {name}")
+
+
+def joints_description(assembly, servo, part_names):
+    """Groups of parts that move together and the revolute joints between them (mm, Z up).
+
+    Servos are listed with the origin of their placement too: a STEP file stores a servo model once,
+    so CAD programs may not keep the individual names of the servos."""
+    groups = {}
+    for name in part_names:
+        groups.setdefault(part_group(name), {"parts": [], "servos": []})["parts"].append(name)
+    for leg in assembly["legs"]:
+        for joint in leg["joints"]:
+            name = f"leg{leg['index']}_{joint['name']}_servo_id{joint['servo_id']}"
+            origin = (np.array(joint["servo"], dtype=float) @ np.array([0, 0, centring(servo), 1.0]))[:3]
+            groups[part_group(name)]["servos"].append({"name": name, "origin": [round(v, 4) for v in origin]})
+
+    joints = []
+    for leg in assembly["legs"]:
+        prefix = f"leg{leg['index']}"
+        parents = ("body", f"{prefix}_coxa", f"{prefix}_femur")
+        for joint, parent in zip(leg["joints"], parents):
+            frame = np.array(joint["frame"], dtype=float)
+            joints.append({
+                "name": f"{prefix}_{joint['name']}",
+                "servo_id": joint["servo_id"],
+                "parent": parent,
+                "child": f"{prefix}_{joint['name']}",
+                "origin": [round(v, 4) for v in frame[:3, 3]],
+                # Positive rotation around this axis is a positive joint angle in GOIK
+                "axis": [round(v, 6) for v in frame[:3, 2]],
+                "rest_angle": joint["angle"],
+            })
+    return {"format": "goik-joints", "version": 1, "name": assembly["name"], "units": "mm",
+            "groups": [{"name": n, **g} for n, g in groups.items()], "joints": joints}
 
 
 def vendor_servo(servo, vendor_dir):
@@ -269,6 +323,16 @@ def main():
 
     assy.export(base + ".step")
     print("Wrote", base + ".step")
+
+    servo = servos[assembly["servo_model"]]
+    part_names = [name for name, _, _ in printable]
+    if vendor_servo(servo, args.vendor) is None:
+        # The simple servo model is a case and a horn per servo
+        part_names += [f"leg{leg['index']}_{j['name']}_servo_id{j['servo_id']}{suffix}"
+                       for leg in assembly["legs"] for j in leg["joints"] for suffix in ("", "_horn")]
+    with open(base + "_joints.json", "w", encoding="utf-8") as f:
+        json.dump(joints_description(assembly, servo, part_names), f, indent=2)
+    print("Wrote", base + "_joints.json")
     if not args.no_stl:
         folder = base + "_stl"
         os.makedirs(folder, exist_ok=True)

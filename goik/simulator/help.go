@@ -67,7 +67,8 @@ var helpSections = []helpSection{
 		"record <on|off>                            - Record servo angles while moving (off discards)",
 		"export <file>                              - Save the recording, using the servo mapping",
 		"export_cad <name>                          - Export the pod in its rest pose to cad/out/<name>.json, and build",
-		"                                             <name>.step and .stl with CadQuery (see CAD_FILES.md)",
+		"                                             <name>.step and .stl with CadQuery (see docs/cad-export.md)",
+		"debug                                      - Show how many servo angle sets have been recorded",
 	}},
 }
 

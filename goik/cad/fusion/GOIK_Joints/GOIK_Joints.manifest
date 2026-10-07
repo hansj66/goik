@@ -1,0 +1,10 @@
+{
+	"autodeskProduct": "Fusion",
+	"type": "script",
+	"author": "GOIK",
+	"description": {
+		"": "Imports a GOIK CAD export (<name>.step) and recreates its joints from <name>_joints.json"
+	},
+	"supportedOS": "windows|mac",
+	"editEnabled": true
+}

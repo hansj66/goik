@@ -1,5 +1,5 @@
 # Convenience targets for GOIK. Everything here can also be run directly, which is the way to go
-# on Windows without make: see the commands below and CAD_FILES.md.
+# on Windows without make: see the commands below, the main README and docs/cad-export.md.
 
 PYTHON ?= python
 

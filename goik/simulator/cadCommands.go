@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-// CAD export (see CAD_FILES.md and cad/goik_cad.py)
+// CAD export (see docs/cad-export.md and cad/goik_cad.py)
 
 const CAD_FOLDER = "cad"
 
