@@ -151,10 +151,12 @@ func (s *Shell) executeServoModelCmd(args []string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("syntax error ('servo_model <%s>'): %+v", strings.Join(robot.ServoModelNames(), " | "), args)
 	}
-	if _, ok := robot.ServoModels[args[1]]; !ok {
+	model, ok := robot.FindServoModel(args[1])
+	if !ok {
 		return fmt.Errorf("unknown servo model '%s'. Supported models: %s", args[1], strings.Join(robot.ServoModelNames(), ", "))
 	}
-	s.Pod.BodyDefinition.ServoMapping().Model = args[1]
+	s.Pod.BodyDefinition.ServoMapping().Model = model
+	s.outputCh <- fmt.Sprintf("Servo model: %s (reset and load replace it with the pod's own mapping)", model)
 	return nil
 }
 

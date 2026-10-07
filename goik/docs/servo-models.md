@@ -8,7 +8,7 @@ model.
 |---|---|---|
 | AX-12A | Measured on the ROBOTIS model, including mounting features | Manual download, mount transform measured |
 | XL-320 | Measured on the ROBOTIS model | Manual download, mount transform measured |
-| STS3215 | Measured on the Waveshare model | Downloaded by `cad/tools.py vendor`, mount transform measured |
+| STS3215 | Measured on the Waveshare model, including mounting features | Downloaded by `cad/tools.py vendor`, mount transform measured |
 
 `python cad/tools.py check` (or `make cad-check`) shows what is installed, downloaded and measured.
 
@@ -59,8 +59,21 @@ back together), prints its position and diameter, and suggests the transform. Ch
 transform into `servos.json`, and record the file's `sha256` (printed too), so that `tools.py` can warn if the vendor
 ever changes the file. Then export again and compare the vendor model with the simple box in CAD.
 
-The mounting features for the printable brackets (`mounting` in `servos.json`: horn screws, idler, case holes) were
-read from a survey of the vendor model's circular features. `measure` doesn't report them yet.
+The mounting features for the printable brackets (`mounting` in `servos.json`) were read from a survey of the vendor
+model's circular and flat faces. `measure` doesn't report them yet. They are, in the servo frame:
+
+| Field | Meaning |
+|---|---|
+| `mid_plane` | Z of the case's mid-plane (servos are centred on their leg plane) |
+| `case_faces` | Z of the flat case faces the brackets sit on, horn side and idler side |
+| `idler_face`, `idler_boss_diameter` | The outer face and diameter of the idler (hub or disc) on the back |
+| `idler_screw_clearance`, `idler_screws` | The hole for the idler's centre screw, and the idler's screw pattern if it has one |
+| `horn_screws`, `horn_screw_clearance`, `horn_centre_clearance` | The horn's screw pattern and the holes for it |
+| `horn_standoff`, `idler_standoff` | How far the arms stand off the horn and idler (on a boss) |
+| `case_holes` | Mounting holes in the case faces: one list for both faces, or `horn_side` and `idler_side` lists |
+| `screw_clearance` | Clearance hole for the case screws |
+
+Only XL-320 has no mounting features yet, so it gets placeholder parts in the export.
 
 ## Licensing
 

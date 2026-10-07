@@ -58,6 +58,20 @@ func ServoModelNames() []string {
 	return names
 }
 
+// FindServoModel looks up a servo model by name, ignoring case, dashes, underscores and spaces
+// ("sts3215", "AX12A" and "ax-12a" all work). Returns the model's name as used in ServoModels.
+func FindServoModel(name string) (string, bool) {
+	normalize := func(s string) string {
+		return strings.NewReplacer("-", "", "_", "", " ", "").Replace(strings.ToUpper(s))
+	}
+	for model := range ServoModels {
+		if normalize(model) == normalize(name) {
+			return model, true
+		}
+	}
+	return "", false
+}
+
 // JointMapping maps one joint to a physical servo
 type JointMapping struct {
 	// Servo id on the bus

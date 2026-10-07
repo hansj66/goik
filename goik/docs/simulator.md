@@ -32,7 +32,10 @@ The scale is fixed at 1 pixel per mm.
 | 3 | Pentapod (wave gait only) |
 | 4 | Heptapod (wave gait only) |
 | 5 | Eight legged "spider" with different leg lengths |
-| 6 | Hexapod designed around real AX-12A servos. Use this one for the [CAD export](cad-export.md): the older pods are too small for real servos |
+| 6 | Hexapod designed around real AX-12A servos |
+| 7 | Hexapod designed around real STS3215 servos |
+
+Use pod 6 or 7 for the [CAD export](cad-export.md): the older pods are too small for real servos.
 
 `save <file>` and `load <file>` store pod definitions (including the [servo mapping](servos.md)) in the `pods` folder.
 
@@ -42,7 +45,7 @@ The scale is fixed at 1 pixel per mm.
 
 | Command | Does |
 |---|---|
-| `reset <0-6>` | Load an example pod |
+| `reset <0-7>` | Load an example pod |
 | `save <file>` / `load <file>` | Save / load the pod definition |
 | `set_coxa_length <ALL \| leg> <mm>` | Also `set_femur_length` and `set_tibia_length` |
 | `set_coxa_angle <ALL \| leg> <degrees>` | Rest angle. Also `set_femur_angle` and `set_tibia_angle` |

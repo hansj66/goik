@@ -71,7 +71,7 @@ Installing make:
 
 GOIK will open a command shell and a graphical XZ/XY and isometric view along with a visualization of the current gait pattern
 
-Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 7 different preloaded models (`reset 0` to `reset 6`) that can be played with to get a feel for the simulator. See [Using the simulator](./goik/docs/simulator.md) for all commands.
+Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 8 different preloaded models (`reset 0` to `reset 7`) that can be played with to get a feel for the simulator. See [Using the simulator](./goik/docs/simulator.md) for all commands.
 
 ### Example session
 
@@ -139,8 +139,8 @@ The mapping is used when exporting recordings, and will be used by the robot con
 
 `export_cad <name>` exports the pod in its rest pose as a STEP assembly: a servo at every joint in the right place
 and orientation, connected by printable brackets, plus one STL per printable part. Open it in Fusion 360 or any other
-CAD program, and move its joints in Fusion with the [GOIK_Joints script](./goik/docs/fusion-joints.md). Example pod 6
-(`reset 6`) is designed around AX-12A servos. The STEP file is built with [CadQuery](https://cadquery.readthedocs.io/)
+CAD program, and move its joints in Fusion with the [GOIK_Joints script](./goik/docs/fusion-joints.md). Example pods 6
+and 7 (`reset 6`, `reset 7`) are designed around AX-12A and STS3215 servos. The STEP file is built with [CadQuery](https://cadquery.readthedocs.io/)
 (`make cad-setup` installs it). See [CAD export](./goik/docs/cad-export.md) for the details, and
 [Servo models](./goik/docs/servo-models.md) for where to download the vendor servo models.
 

@@ -27,7 +27,7 @@ type helpSection struct {
 
 var helpSections = []helpSection{
 	{"design", "Pod design", []string{
-		"reset <0-6>                                - Load example pod <n> (6: designed for AX-12A servos)",
+		"reset <0-7>                                - Load example pod <n> (6: AX-12A servos, 7: STS3215 servos)",
 		"save <filename> / load <filename>          - Save / load the pod definition (including servo mapping)",
 		"set_coxa_length <ALL | legNum> <length>    - Also set_femur_length and set_tibia_length",
 		"set_coxa_angle <ALL | legNum> <angle>      - Rest angle. Also set_femur_angle and set_tibia_angle",

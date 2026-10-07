@@ -194,3 +194,32 @@ func NewExampleHexapodAX12() *BodyDefinition {
 
 	return b
 }
+
+// Example hexapod designed around Feetech STS3215 servos (45.22 x 24.72 mm cases, see cad/servos.json).
+// The coxa mounts are far enough from the centre for the six coxa servo cases to fit, the coxa (52 mm)
+// is long enough for the femur servo's mounting to clear the coxa servo's corners at any coxa angle,
+// and the femur clears the tibia servo. The rest pose puts the feet 85 mm outside the femur joints and
+// 105 mm below the body. The CAD export of this pod, including the printable brackets, has no collisions.
+func NewExampleHexapodSTS3215() *BodyDefinition {
+	gait, _ := NewHexapodGait(TRIPOD)
+	b := &BodyDefinition{
+		NumLegs:    6,
+		CoxaAngles: []float64{0, 60, 120, 180, 240, 300},
+		Gait:       gait,
+	}
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{66, 0, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{33, 57.16, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{-33, 57.16, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{-66, 0, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{-33, -57.16, 0})
+	b.CoxaCoordinates = append(b.CoxaCoordinates, Coordinate{33, -57.16, 0})
+
+	for i := 0; i < b.NumLegs; i++ {
+		b.RestAngles = append(b.RestAngles, ServoAngles{Coxa: 0, Femur: -11, Tibia: 94})
+		b.Segments = append(b.Segments, SegmentLengths{Coxa: 52, Femur: 70, Tibia: 120})
+	}
+	b.Servos = NewDefaultServoMapping(b.NumLegs)
+	b.Servos.Model = "STS3215"
+
+	return b
+}

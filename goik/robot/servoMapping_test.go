@@ -55,6 +55,20 @@ func TestToRaw(t *testing.T) {
 	}
 }
 
+func TestFindServoModel(t *testing.T) {
+	for _, name := range []string{"STS3215", "sts3215", "STS-3215", "ax-12a", "AX12A", "xl_320"} {
+		if _, ok := FindServoModel(name); !ok {
+			t.Errorf("%q was not found", name)
+		}
+	}
+	if model, _ := FindServoModel("ax 12a"); model != "AX-12A" {
+		t.Errorf("FindServoModel returned %q, want AX-12A", model)
+	}
+	if _, ok := FindServoModel("SG90"); ok {
+		t.Error("SG90 should not be found")
+	}
+}
+
 func TestTargetsUseReadmeAddressing(t *testing.T) {
 	m := NewDefaultServoMapping(2)
 	targets := m.Targets([]ServoAngles{{}, {Coxa: 75}})

@@ -43,10 +43,29 @@
     }
   },
   "STS3215": {
-    "source": "Measured on Waveshare's ST3215.step (python cad/tools.py measure): case 45.22 x 24.72 mm, 35 mm deep, horn diameter 18.8 mm, horn axis 10.11 mm from the near end. Overall depth 37.8 mm including the horn",
+    "source": "Measured on Waveshare's ST3215.step (python cad/tools.py measure and a survey of its features): case 45.22 x 24.72 mm, 33.1 mm between the mounting faces, horn diameter 19.2 mm, horn axis 10.11 mm from the near end. Overall depth 37.8 mm including the horn and the disc on the back",
     "verified": true,
     "case": {"length": 45.22, "width": 24.72, "depth": 35, "axis_from_end": 10.11},
-    "horn": {"diameter": 18.8, "thickness": 2.8},
+    "horn": {"diameter": 19.2, "thickness": 2.8},
+    "mounting": {
+      "_comment": "Measured on Waveshare's ST3215.step. 8 mounting holes for self-tapping M2 screws (1.6 mm) in the case walls, 4 on each side, with different positions on the two sides. The back has a disc with the same 4-screw pattern as the horn (radius 7 mm, 2.5 mm holes: probably M3, check with the real servo). The horn and the disc stand only about 2 mm proud of the case, so the arms stand off them by 3 mm to leave room for 4 mm plates",
+      "mid_plane": -18.65,
+      "case_faces": [-2.1, -35.2],
+      "idler_face": -37.25,
+      "idler_boss_diameter": 19.2,
+      "idler_screw_clearance": 6.5,
+      "idler_screws": [[7, 0], [-7, 0], [0, 7], [0, -7]],
+      "idler_standoff": 3.0,
+      "horn_screws": [[7, 0], [-7, 0], [0, 7], [0, -7]],
+      "horn_screw_clearance": 3.4,
+      "horn_centre_clearance": 6.5,
+      "horn_standoff": 3.0,
+      "case_holes": {
+        "horn_side": [[-8.3, 10.25], [-8.3, -10.25], [-29.0, 10.25], [-29.0, -10.25]],
+        "idler_side": [[-8.3, 10.25], [-8.3, -10.25], [-32.75, 10.25], [-32.75, -10.25]]
+      },
+      "screw_clearance": 2.4
+    },
     "vendor_step": {
       "file": "STS3215.step",
       "page": "https://www.waveshare.com/wiki/ST3215_Servo",

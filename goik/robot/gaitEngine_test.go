@@ -169,6 +169,7 @@ func TestGaitEngineChainedMotions(t *testing.T) {
 		"hexapod1": NewExampleHexapod1,
 		"hexapod2": NewExampleHexapod2,
 		"ax12":     NewExampleHexapodAX12,
+		"sts3215":  NewExampleHexapodSTS3215,
 	}
 
 	for name, body := range bodies {
