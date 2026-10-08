@@ -31,6 +31,10 @@ func TestNewPhaseGait(t *testing.T) {
 		{"hexapod ripple", 6, func() (*Gait, error) { return NewHexapodGait(RIPPLE) }, 2.0 / 3, []float64{0, 2.0 / 3, 1.0 / 3, 0, 2.0 / 3, 1.0 / 3}},
 		{"hexapod wave", 6, func() (*Gait, error) { return NewHexapodGait(WAVE) }, 5.0 / 6, []float64{3.0 / 6, 4.0 / 6, 5.0 / 6, 0, 1.0 / 6, 2.0 / 6}},
 		{"pentapod wave", 5, func() (*Gait, error) { return NewPentapodGait(WAVE) }, 0.8, []float64{0.8, 0.6, 0.4, 0.2, 0}},
+		{"quadruped tripod", 4, func() (*Gait, error) { return NewGait(4, TRIPOD) }, 0.5, []float64{0, 0.5, 0, 0.5}},
+		{"octopod tripod", 8, func() (*Gait, error) { return NewGait(8, TRIPOD) }, 0.5, []float64{0, 0.5, 0, 0.5, 0, 0.5, 0, 0.5}},
+		{"octopod wave", 8, func() (*Gait, error) { return NewGait(8, WAVE) }, 7.0 / 8, []float64{7.0 / 8, 0, 1.0 / 8, 2.0 / 8, 3.0 / 8, 4.0 / 8, 5.0 / 8, 6.0 / 8}},
+		{"nonapod ripple", 9, func() (*Gait, error) { return NewGait(9, RIPPLE) }, 2.0 / 3, []float64{0, 2.0 / 3, 1.0 / 3, 0, 2.0 / 3, 1.0 / 3, 0, 2.0 / 3, 1.0 / 3}},
 	}
 
 	for _, tt := range tests {
@@ -115,7 +119,10 @@ func runScenario(t *testing.T, body *BodyDefinition, steps []step) runStats {
 	}
 
 	for _, s := range steps {
-		g, _ := NewHexapodGait(s.gait)
+		g, err := NewGait(len(p.Legs), s.gait)
+		if err != nil {
+			t.Fatal(err)
+		}
 		pg, err := NewPhaseGait(g, len(p.Legs))
 		if err != nil {
 			t.Fatal(err)
@@ -274,5 +281,25 @@ func TestOdometryKeepsGroundedFeetFixed(t *testing.T) {
 	}
 	if gx, gy := e.WorldToGround(e.GroundToWorld(12, 34)); math.Abs(gx-12) > 1e-9 || math.Abs(gy-34) > 1e-9 {
 		t.Errorf("WorldToGround(GroundToWorld(12, 34)) = %f, %f", gx, gy)
+	}
+}
+
+func TestGeneratedGaitsRejectInvalidLegCounts(t *testing.T) {
+	for _, tt := range []struct {
+		numLegs int
+		gait    GaitType
+	}{{5, TRIPOD}, {9, TRIPOD}, {8, RIPPLE}, {2, WAVE}} {
+		if _, err := NewGait(tt.numLegs, tt.gait); err == nil {
+			t.Errorf("%d legs, gait %d: no error", tt.numLegs, tt.gait)
+		}
+	}
+}
+
+func TestGaitType(t *testing.T) {
+	for _, want := range []GaitType{TRIPOD, RIPPLE, WAVE} {
+		g, _ := NewGait(6, want)
+		if got, err := g.Type(); err != nil || got != want {
+			t.Errorf("%s: type %d (%v), want %d", g.Name, got, err, want)
+		}
 	}
 }

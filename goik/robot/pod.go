@@ -44,69 +44,90 @@ func (p *Pod) SetDebugChannel(channel chan string) {
 	p.debugChannel = channel
 }
 
-// SetCoxaLength redefines the length of the coxa leg segment
-func (p *Pod) SetCoxaLength(legNum int, length float64) error {
-	if legNum > p.BodyDefinition.NumLegs-1 {
-		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, p.BodyDefinition.NumLegs)
+// setLeg changes the segment lengths and rest angles of a leg. When the pod has a design, the change is made
+// to the design, so the leg's mirror image changes with it, and the pod is rebuilt from the design. When the
+// pod has a stance, the stance sets the femur and tibia rest angles. The pod is unchanged if the change fails.
+func (p *Pod) setLeg(legNum int, change func(segments *SegmentLengths, rest *ServoAngles)) error {
+	b := p.BodyDefinition
+	if legNum < 0 || legNum >= b.NumLegs {
+		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, b.NumLegs)
 	}
 
-	p.BodyDefinition.Segments[legNum].Coxa = length
-	p.UpdatePodStructure()
+	segments, rest := b.Segments[legNum], b.RestAngles[legNum]
+	change(&segments, &rest)
+	if b.Stance != nil && (rest.Femur != b.RestAngles[legNum].Femur || rest.Tibia != b.RestAngles[legNum].Tibia) {
+		return fmt.Errorf("the pod's stance sets the femur and tibia rest angles. Change the stance ('stance <height> [reach]') or remove it ('stance off')")
+	}
+
+	if b.Design != nil {
+		d := b.Design.Clone()
+		if err := d.SetLeg(legNum, segments, rest); err != nil {
+			return err
+		}
+		return p.ApplyDesign(d)
+	}
+
+	changed := *b
+	changed.Segments = append([]SegmentLengths(nil), b.Segments...)
+	changed.RestAngles = append([]ServoAngles(nil), b.RestAngles...)
+	changed.Segments[legNum], changed.RestAngles[legNum] = segments, rest
+	if changed.Stance != nil {
+		if err := applyStance(&changed, changed.Stance); err != nil {
+			return fmt.Errorf("not possible with the pod's stance (change the stance, or remove it with 'stance off'): %w", err)
+		}
+	}
+	p.LoadBodyDefinition(&changed)
 	return nil
+}
+
+// SetCoxaLength redefines the length of the coxa leg segment
+func (p *Pod) SetCoxaLength(legNum int, length float64) error {
+	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles) { s.Coxa = length })
 }
 
 // SetFemurLength redefines the length of the femur leg segment
 func (p *Pod) SetFemurLength(legNum int, length float64) error {
-	if legNum > p.BodyDefinition.NumLegs-1 {
-		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, p.BodyDefinition.NumLegs)
-	}
-
-	p.BodyDefinition.Segments[legNum].Femur = length
-	p.UpdatePodStructure()
-	return nil
+	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles) { s.Femur = length })
 }
 
 // SetTibiaLength redefines the length of the tibia segment
 func (p *Pod) SetTibiaLength(legNum int, length float64) error {
-	if legNum > p.BodyDefinition.NumLegs-1 {
-		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, p.BodyDefinition.NumLegs)
-	}
-
-	p.BodyDefinition.Segments[legNum].Tibia = length
-	p.UpdatePodStructure()
-	return nil
+	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles) { s.Tibia = length })
 }
 
-// SetFemurAngle redefines the angle of the femur joint
+// SetCoxaAngle redefines the rest angle of the coxa joint
 func (p *Pod) SetCoxaAngle(legNum int, angle float64) error {
-	if legNum > p.BodyDefinition.NumLegs-1 {
-		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, p.BodyDefinition.NumLegs)
-	}
-
-	p.BodyDefinition.RestAngles[legNum].Coxa = angle
-	p.UpdatePodStructure()
-	return nil
+	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles) { a.Coxa = angle })
 }
 
-// SetFemurAngle redefines the angle of the femur joint
+// SetFemurAngle redefines the rest angle of the femur joint
 func (p *Pod) SetFemurAngle(legNum int, angle float64) error {
-	if legNum > p.BodyDefinition.NumLegs-1 {
-		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, p.BodyDefinition.NumLegs)
-	}
-
-	p.BodyDefinition.RestAngles[legNum].Femur = angle
-	p.UpdatePodStructure()
-	return nil
+	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles) { a.Femur = angle })
 }
 
-// SetTibiaAngle redefines the angle of the tibia joint
+// SetTibiaAngle redefines the rest angle of the tibia joint
 func (p *Pod) SetTibiaAngle(legNum int, angle float64) error {
-	if legNum > p.BodyDefinition.NumLegs-1 {
-		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, p.BodyDefinition.NumLegs)
-	}
+	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles) { a.Tibia = angle })
+}
 
-	p.BodyDefinition.RestAngles[legNum].Tibia = angle
-	p.UpdatePodStructure()
+// ApplyDesign rebuilds the pod from a design, keeping the gait type and the servo mapping when they fit the
+// new number of legs (see PodDesign.BodyDefinition), and the stance. The pod is unchanged if the design is
+// invalid or the stance isn't possible with it.
+func (p *Pod) ApplyDesign(d *PodDesign) error {
+	b, err := d.BodyDefinition(p.BodyDefinition)
+	if err != nil {
+		return err
+	}
+	if s := p.BodyDefinition.Stance; s != nil {
+		s = s.Clone()
+		if b.NumLegs != p.BodyDefinition.NumLegs {
+			s.LegReach = nil
+		}
+		if err := applyStance(b, s); err != nil {
+			return fmt.Errorf("not possible with the pod's stance (change the stance, or remove it with 'stance off'): %w", err)
+		}
+	}
+	p.LoadBodyDefinition(b)
 	return nil
 }
 
@@ -200,22 +221,6 @@ func (p *Pod) Update() {
 	}
 
 	p.CurrentGaitIndex = p.Engine.PatternIndex(p.BodyDefinition.Gait.NumIndicesInPattern)
-}
-
-// Ground moves all end effectors to the given height (Z, in the base reference frame) and
-// makes the result the new rest stance
-func (p *Pod) Ground(height float64) error {
-	angles := make([]ServoAngles, len(p.Legs))
-	for i, l := range p.Legs {
-		a, err := SolveEffectorIK(l, NewCoordinate(l.Joints[EFFECTOR_ORIGIN_INDEX].X, l.Joints[EFFECTOR_ORIGIN_INDEX].Y, height), p.debugChannel)
-		if err != nil {
-			return fmt.Errorf("leg %d: %w", i, err)
-		}
-		angles[i] = a
-	}
-	copy(p.BodyDefinition.RestAngles, angles)
-	p.UpdatePodStructure()
-	return nil
 }
 
 // ReachRadius returns the largest radius (in mm, 5 mm resolution) around the neutral end effector

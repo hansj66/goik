@@ -17,18 +17,22 @@ package robot
 /*
 	Notes regarding gaits
 
-	1) Yes, these patterns could be created algorithmically, but it would make the code harder to read.
-	   It also makes my head hurt.
+	1) Pentapods, hexapods and heptapods have hand written patterns, since they are easier to read than code.
+	   Other numbers of legs get generated patterns (see newGeneratedGait).
 	2) Currently supported gaits:
 		- Hexapods: 									tripod, ripple and wave gait.
-		- <Odd number>pods (pentapods/heptapods):	    wave gait.
-		- <Even number>pods (hexapod): 	                wave gait, ripple gait.
-		  (gait type is still an argument for constructing these patterns, since someone just might come
-		   up with some clever new gait)
+		- Pentapods and heptapods:						wave gait.
+		- Other numbers of legs (3 or more):			wave gait, tripod gait (every other leg) for an even
+		                                                number of legs, and ripple gait for a multiple of 3.
+		  The patterns assume that the legs are numbered in order around the body (as in the example pods and
+		  pod designs), so that neighbouring legs don't swing together.
 	3) Yes, a symmetrical centipede with metachronal gait would be nice. Unfortunately I've run out of dynamixels
 */
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type GaitType int
 
@@ -160,5 +164,55 @@ func NewGait(NumLegs int, GaitType GaitType) (*Gait, error) {
 		return NewHeptapodGait(GaitType)
 	}
 
-	return nil, fmt.Errorf("missing gait definition for pod with %d legs. Please update gaits.go.", NumLegs)
+	return newGeneratedGait(NumLegs, GaitType)
+}
+
+// newGeneratedGait creates a gait pattern for 3 or more legs, numbered in order around the body
+//   - Tripod: every other leg swings, so the legs swing in two alternating groups. Needs an even number of legs
+//   - Ripple: three groups (leg n swings with legs n+3, n+6 ...), like the hexapod ripple gait. Needs a multiple of 3
+//   - Wave: one leg at a time, going around the body
+func newGeneratedGait(numLegs int, gaitType GaitType) (*Gait, error) {
+	if numLegs < 3 {
+		return nil, fmt.Errorf("a pod needs at least 3 legs to walk (this one has %d)", numLegs)
+	}
+
+	var name string
+	var columns int
+	var swingColumn func(leg int) int
+	switch gaitType {
+	case TRIPOD:
+		if numLegs%2 != 0 {
+			return nil, fmt.Errorf("tripod gait needs an even number of legs (this pod has %d)", numLegs)
+		}
+		name, columns = "Tripod gait", 2
+		swingColumn = func(leg int) int { return (leg + 1) % 2 }
+	case RIPPLE:
+		if numLegs%3 != 0 {
+			return nil, fmt.Errorf("ripple gait needs a multiple of 3 legs (this pod has %d)", numLegs)
+		}
+		name, columns = "Ripple gait", 3
+		swingColumn = func(leg int) int { return (leg + 2) % 3 }
+	default:
+		name, columns = "Wave gait", numLegs
+		swingColumn = func(leg int) int { return (numLegs - leg) % numLegs }
+	}
+
+	p := make(GaitPattern, numLegs)
+	for leg := range p {
+		p[leg] = make([]int, columns) // 1 == swing phase, 0 == stance phase
+		p[leg][swingColumn(leg)] = 1
+	}
+	return &Gait{
+		Pattern:             &p,
+		Name:                name,
+		NumIndicesInPattern: columns,
+	}, nil
+}
+
+// Type returns the type of a gait, from its name
+func (g *Gait) Type() (GaitType, error) {
+	if g == nil {
+		return TRIPOD, fmt.Errorf("no gait defined")
+	}
+	return ParseGaitType(strings.ToLower(strings.TrimSuffix(g.Name, " gait")))
 }

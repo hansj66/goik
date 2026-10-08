@@ -43,14 +43,25 @@ Use pod 6 or 7 for the [CAD export](cad-export.md): the older pods are too small
 
 ### Pod design
 
+A step by step guide with examples: [designing-a-pod.md](designing-a-pod.md).
+
 | Command | Does |
 |---|---|
 | `reset <0-7>` | Load an example pod |
 | `save <file>` / `load <file>` | Save / load the pod definition |
-| `set_coxa_length <ALL \| leg> <mm>` | Also `set_femur_length` and `set_tibia_length` |
-| `set_coxa_angle <ALL \| leg> <degrees>` | Rest angle. Also `set_femur_angle` and `set_tibia_angle` |
-| `ground <height>` | Move all feet to Z = height (positive is down) and make that the rest stance |
+| `set_coxa_length <ALL \| leg> <mm>` | Coxa length |
+| `set_femur_length <ALL \| leg> <mm>` | Femur length |
+| `set_tibia_length <ALL \| leg> <mm>` | Tibia length |
+| `set_coxa_angle <ALL \| leg> <degrees>` | Coxa rest angle |
+| `set_femur_angle <ALL \| leg> <degrees>` | Femur rest angle |
+| `set_tibia_angle <ALL \| leg> <degrees>` | Tibia rest angle |
+| `stance <height> [reach \| vertical]` | Set how high the body stands above the ground. The femur and tibia rest angles are computed from it. See [Stance](designing-a-pod.md#stance-how-high-the-pod-stands) |
+| `stance reach <leg> <reach \| default>` | Reach (foot distance from the femur joint) for one leg |
+| `stance` / `stance off` | Show the stance, with the possible heights / set the femur and tibia rest angles by hand again |
 | `effectors` | Print the end effector (foot) positions |
+| `design ...` | Design the pod from its body outline and leg mounts, symmetric about the Y axis. See [designing-a-pod.md](designing-a-pod.md) |
+
+While a pod has a design, the leg commands change a leg and its mirror image together.
 
 Changing the pod's geometry stops the gait engine and a running script.
 

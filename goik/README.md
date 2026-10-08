@@ -5,6 +5,8 @@ Building and a quick start are in the [main README](../README.md). The documenta
 | Document | About |
 |---|---|
 | [docs/simulator.md](docs/simulator.md) | Using the simulator: the views, the example pods and all shell commands |
+| [docs/designing-a-pod.md](docs/designing-a-pod.md) | Designing a pod: body, legs, segment lengths, joint angles and stance, with examples |
+| [docs/pod-designer.md](docs/pod-designer.md) | Plan for the interactive pod designer |
 | [docs/gait-engine.md](docs/gait-engine.md) | How walking, gait transitions and the body pose work |
 | [docs/scripts.md](docs/scripts.md) | Motion scripts: chaining walks, turns, gait changes and poses |
 | [docs/servos.md](docs/servos.md) | Servo mapping, servo models and Dynamixel hardware |

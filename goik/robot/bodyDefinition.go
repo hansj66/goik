@@ -41,6 +41,10 @@ type BodyDefinition struct {
 	RestAngles []ServoAngles `json:"Angles"`
 	// Maps joints to physical servos. Nil means the default mapping (see ServoMapping())
 	Servos *ServoMapping `json:"Servos,omitempty"`
+	// The design the geometry above was built from (see podDesign.go). Nil for pods without a design
+	Design *PodDesign `json:"Design,omitempty"`
+	// The stance the femur and tibia rest angles are computed from (see stance.go). Nil: they are set by hand
+	Stance *Stance `json:"Stance,omitempty"`
 }
 
 // ServoMapping returns the pod's servo mapping, creating the default mapping if none is defined
@@ -94,5 +98,25 @@ func (b *BodyDefinition) Load(filename string) (*BodyDefinition, error) {
 		}
 	}
 
-	return &definition, nil
+	// The design is the source of the geometry
+	result := &definition
+	if definition.Design != nil {
+		rebuilt, err := definition.Design.BodyDefinition(&definition)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", filename, err)
+		}
+		if rebuilt.NumLegs != definition.NumLegs {
+			return nil, fmt.Errorf("%s: the design has %d legs, but the pod definition has %d", filename, rebuilt.NumLegs, definition.NumLegs)
+		}
+		result = rebuilt
+	}
+
+	// And the stance is the source of the femur and tibia rest angles
+	if definition.Stance != nil {
+		if err := applyStance(result, definition.Stance); err != nil {
+			return nil, fmt.Errorf("%s: %w", filename, err)
+		}
+	}
+
+	return result, nil
 }

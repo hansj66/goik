@@ -36,185 +36,81 @@ func (s *Shell) executeEffectorsCmd(args []string) error {
 }
 
 func (s *Shell) executeSetCoxaLengthCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('set_coxa_length <legnum> <length>'): %+v", args)
-	}
-
-	length, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('set_coxa_length <legnum> <length>'): %+v", args)
-	}
-
-	if strings.ToUpper(args[1]) == "ALL" {
-		for _, l := range s.Pod.Legs {
-			s.Pod.SetCoxaLength(l.Index, length)
-			s.outputCh <- fmt.Sprintf("Changing coxa length of leg %d to %2.2f", l.Index, length)
-		}
-	} else {
-		legnum, err := strconv.ParseInt(args[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("syntax error ('set_coxa_length <legnum> <length>'): %+v", args)
-		}
-		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
-			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
-		}
-		s.outputCh <- fmt.Sprintf("Changing coxa length of leg %d to %2.2f", legnum, length)
-		s.Pod.SetCoxaLength(int(legnum), length)
-	}
-	return nil
+	return s.setLegValue(args, "set_coxa_length <ALL | legNum> <length>", "coxa length", (*robot.Pod).SetCoxaLength)
 }
 
 func (s *Shell) executeSetFemurLengthCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('set_femur_length <legnum> <length>'): %+v", args)
-	}
-
-	length, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('set_femur_length <legnum> <length>'): %+v", args)
-	}
-
-	if strings.ToUpper(args[1]) == "ALL" {
-		for _, l := range s.Pod.Legs {
-			s.Pod.SetFemurLength(l.Index, length)
-			s.outputCh <- fmt.Sprintf("Changing femur length of leg %d to %2.2f", l.Index, length)
-		}
-	} else {
-		legnum, err := strconv.ParseInt(args[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("syntax error ('set_femur_length <legnum> <length>'): %+v", args)
-		}
-		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
-			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
-		}
-		s.outputCh <- fmt.Sprintf("Changing femur length of leg %d to %2.2f", legnum, length)
-		s.Pod.SetFemurLength(int(legnum), length)
-	}
-
-	return nil
+	return s.setLegValue(args, "set_femur_length <ALL | legNum> <length>", "femur length", (*robot.Pod).SetFemurLength)
 }
 
 func (s *Shell) executeSetTibiaLengthCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('set_tibia_length <legnum> <length>'): %+v", args)
-	}
-
-	length, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('set_tibia_length <legnum> <length>'): %+v", args)
-	}
-
-	if strings.ToUpper(args[1]) == "ALL" {
-		for _, l := range s.Pod.Legs {
-			s.Pod.SetTibiaLength(l.Index, length)
-			s.outputCh <- fmt.Sprintf("Changing tibia length of leg %d to %2.2f", l.Index, length)
-		}
-	} else {
-		legnum, err := strconv.ParseInt(args[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("syntax error ('set_tibia_length <legnum> <length>'): %+v", args)
-		}
-		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
-			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
-		}
-		s.outputCh <- fmt.Sprintf("Changing tibia length to %2.2f", length)
-		s.Pod.SetTibiaLength(int(legnum), length)
-	}
-	return nil
+	return s.setLegValue(args, "set_tibia_length <ALL | legNum> <length>", "tibia length", (*robot.Pod).SetTibiaLength)
 }
 
 func (s *Shell) executeSetCoxaAngleCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('set_coxa_angle <legnum> <angle>'): %+v", args)
-	}
-
-	angle, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('set_coxa_angle  <legnum> <angle>'): %+v", args)
-	}
-
-	if strings.ToUpper(args[1]) == "ALL" {
-		for _, l := range s.Pod.Legs {
-			s.Pod.SetCoxaAngle(l.Index, angle)
-			s.outputCh <- fmt.Sprintf("Changing coxa angle of leg %d to %2.2f", l.Index, angle)
-		}
-	} else {
-		legnum, err := strconv.ParseInt(args[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("syntax error ('set_coxa_angle  <legnum> <angle>'): %+v", args)
-		}
-		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
-			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
-		}
-		s.outputCh <- fmt.Sprintf("Changing coxa angle of leg %d to %2.2f", legnum, angle)
-		s.Pod.SetCoxaAngle(int(legnum), angle)
-	}
-	return nil
+	return s.setLegValue(args, "set_coxa_angle <ALL | legNum> <angle>", "coxa angle", (*robot.Pod).SetCoxaAngle)
 }
 
 func (s *Shell) executeSetFemurAngleCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('set_femur_angle  <legnum> <angle>'): %+v", args)
-	}
-
-	angle, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('set_femur_angle  <legnum> <angle>'): %+v", args)
-	}
-
-	if strings.ToUpper(args[1]) == "ALL" {
-		for _, l := range s.Pod.Legs {
-			s.Pod.SetFemurAngle(l.Index, angle)
-			s.outputCh <- fmt.Sprintf("Changing femur angle of leg %d to %2.2f", l.Index, angle)
-		}
-	} else {
-		legnum, err := strconv.ParseInt(args[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("syntax error ('set_femur_angle  <legnum> <angle>'): %+v", args)
-		}
-		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
-			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
-		}
-		s.outputCh <- fmt.Sprintf("Changing femur angle of leg %d to %2.2f", legnum, angle)
-		s.Pod.SetFemurAngle(int(legnum), angle)
-	}
-
-	return nil
+	return s.setLegValue(args, "set_femur_angle <ALL | legNum> <angle>", "femur angle", (*robot.Pod).SetFemurAngle)
 }
 
 func (s *Shell) executeSetTibiaAngleCmd(args []string) error {
+	return s.setLegValue(args, "set_tibia_angle <ALL | legNum> <angle>", "tibia angle", (*robot.Pod).SetTibiaAngle)
+}
+
+// setLegValue sets a segment length or rest angle of one leg, or of ALL legs. When the pod has a design, a
+// leg's mirror image changes with it, so ALL changes the legs on the +X side and the legs on the axis.
+func (s *Shell) setLegValue(args []string, usage string, what string, set func(*robot.Pod, int, float64) error) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 	if len(args) != 3 {
-		return fmt.Errorf("syntax error ('set_tibia_angle <angle>'): %+v", args)
+		return fmt.Errorf("syntax error ('%s'): %+v", usage, args)
+	}
+	value, err := strconv.ParseFloat(args[2], 64)
+	if err != nil {
+		return fmt.Errorf("syntax error ('%s'): %+v", usage, args)
 	}
 
-	angle, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('set_tibia_angle <angle>'): %+v", args)
+	design := s.Pod.BodyDefinition.Design
+	changed := func(leg int) string {
+		message := fmt.Sprintf("Changing %s of leg %d to %2.2f", what, leg, value)
+		if design != nil {
+			if mirror := design.Mirror(leg); mirror != -1 {
+				message += fmt.Sprintf(" (and of leg %d, its mirror image)", mirror)
+			}
+		}
+		return message
 	}
 
 	if strings.ToUpper(args[1]) == "ALL" {
-		for _, l := range s.Pod.Legs {
-			s.Pod.SetTibiaAngle(l.Index, angle)
-			s.outputCh <- fmt.Sprintf("Changing tibia angle of leg %d to %2.2f", l.Index, angle)
+		var legs []robot.DesignLeg
+		if design != nil {
+			legs, _ = design.Legs()
 		}
-	} else {
-		legnum, err := strconv.ParseInt(args[1], 10, 32)
-		if err != nil {
-			return fmt.Errorf("syntax error ('set_tibia_angle <angle>'): %+v", args)
+		for leg := 0; leg < s.Pod.BodyDefinition.NumLegs; leg++ {
+			if leg < len(legs) && legs[leg].Mirrored {
+				continue
+			}
+			if err := set(s.Pod, leg, value); err != nil {
+				s.outputCh <- fmt.Sprintf("Leg %d: %v", leg, err)
+				continue
+			}
+			s.outputCh <- changed(leg)
 		}
-		if legnum < 0 || legnum >= int64(s.Pod.BodyDefinition.NumLegs) {
-			return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
-		}
-		s.outputCh <- fmt.Sprintf("Changing tibia angle og leg %d to %2.2f", legnum, angle)
-		s.Pod.SetTibiaAngle(int(legnum), angle)
+		return nil
 	}
+
+	legnum, err := strconv.Atoi(args[1])
+	if err != nil {
+		return fmt.Errorf("syntax error ('%s'): %+v", usage, args)
+	}
+	if legnum < 0 || legnum >= s.Pod.BodyDefinition.NumLegs {
+		return fmt.Errorf("invalid leg index. (Pod has %d legs. Indexing is 0 based)", s.Pod.BodyDefinition.NumLegs)
+	}
+	if err := set(s.Pod, legnum, value); err != nil {
+		return err
+	}
+	s.outputCh <- changed(legnum)
 	return nil
 }
 
@@ -363,19 +259,4 @@ func folderExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-func (s *Shell) executeGroundCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('ground <height>'): %+v", args)
-	}
-
-	height, err := strconv.ParseFloat(args[1], 64)
-	if err != nil {
-		return fmt.Errorf("syntax error ('ground <height>'): %+v", args)
-	}
-
-	return s.Pod.Ground(height)
 }
