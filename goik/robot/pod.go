@@ -33,34 +33,15 @@ type Pod struct {
 	BodyDefinition *BodyDefinition
 	// Column of the gait pattern table matching the gait engine's clock (used for visualization)
 	CurrentGaitIndex int
-	// If IsRecording is true, all changes in angles during movement is recorded
-	// in a motion set
-	IsRecording bool
-	// If recording is true, all angle changes will be recorded in MotionPrimitive
-	MotionPrimitive *MotionPrimitive
-	// tick indicates the total number of movement update ticks
-	tick         int
-	debugChannel chan string
+	debugChannel     chan string
 	// Engine is the gait engine moving the legs. It is created on demand (see NewGaitEngine)
 	// and dropped whenever the pod's structure changes, since it holds per leg state.
 	Engine *GaitEngine
 }
 
-func (p *Pod) GetTick() int {
-	return p.tick
-}
-
-func (p *Pod) ResetTicks() {
-	p.tick = 0
-}
-
 // SetDebugChannel sets the output channel for debug messages
 func (p *Pod) SetDebugChannel(channel chan string) {
 	p.debugChannel = channel
-}
-
-func (p *Pod) Debug(msg string) {
-	p.debugChannel <- msg
 }
 
 // SetCoxaLength redefines the length of the coxa leg segment
@@ -156,7 +137,6 @@ func (p *Pod) UpdatePodStructure() {
 
 func (p *Pod) LoadBodyDefinition(BodyDefinition *BodyDefinition) {
 	p.Legs = make([]*Leg, BodyDefinition.NumLegs)
-	p.MotionPrimitive = NewMotionPrimitive()
 	p.BodyDefinition = BodyDefinition
 
 	p.UpdatePodStructure()
@@ -208,7 +188,7 @@ func (p *Pod) GaitCycles() float64 {
 	return p.Engine.Cycles()
 }
 
-// Update advances the gait engine (if any) one tick and records the servo angles if recording
+// Update advances the gait engine (if any) one tick
 func (p *Pod) Update() {
 	if p.Engine == nil {
 		return
@@ -219,21 +199,7 @@ func (p *Pod) Update() {
 		return
 	}
 
-	p.tick += 1
 	p.CurrentGaitIndex = p.Engine.PatternIndex(p.BodyDefinition.Gait.NumIndicesInPattern)
-
-	// We can use the "record" command from the command line to record all movement
-	// and save it as a primitive
-	if p.IsRecording {
-		for _, l := range p.Legs {
-			p.MotionPrimitive.Add(l.ServoAngles)
-		}
-	}
-}
-
-// ClearPrimitives purges all recorded data
-func (p *Pod) ClearPrimitives() {
-	p.MotionPrimitive.Clear()
 }
 
 // Ground moves all end effectors to the given height (Z, in the base reference frame) and
@@ -272,18 +238,4 @@ func (p *Pod) ReachRadius(lift float64) float64 {
 		reach = r
 	}
 	return reach
-}
-
-// Zero resets all servo angles in the robot to 0 degrees.
-// This should result in the pod having all legs stretched
-// out and each leg forming a straight line away from the robot body
-// If it does not, you will have to mechanically adjust the robot body
-// so that this condition is satisfied.
-// This is a prerequisit for the FK/IK math to make sense in meat space ;)
-// The gait engine is dropped, since the legs are no longer where it left them.
-func (p *Pod) Zero() {
-	for _, l := range p.Legs {
-		l.Zero()
-	}
-	p.Engine = nil
 }

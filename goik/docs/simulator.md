@@ -1,7 +1,7 @@
 # Using the simulator
 
 Start the simulator from the `goik/goik` folder (`make run`, `go run .` or the built `GOIK` / `GOIK.exe`). It looks
-for `scripts`, `pods`, `primitives` and `cad` relative to the current folder.
+for `scripts`, `pods` and `cad` relative to the current folder.
 
 It opens a window with four views and a command shell in the terminal. Type commands in the shell; `help` lists them
 all, and `help <section>` shows one section (design, walk, pose, scripts, servos). `/quit` closes both the shell and
@@ -14,7 +14,7 @@ the window, and closing the window ends the shell.
 | XZ (top left) | The pod from the side |
 | XY (top right) | The pod from above, with a 50 mm ground grid that moves and rotates under the pod as it walks, the body's path (orange), the feet's recent trails, the neutral foot positions (circles) and where swinging feet will land (blue rings). Legs in swing are drawn in blue |
 | Isometric (bottom right) | The pod in 3D, standing on the ground grid |
-| Gait (bottom left) | The selected gait's pattern (white: swing, grey: stance), the number of gait cycles walked, and the recording state |
+| Gait (bottom left) | The selected gait's pattern (white: swing, grey: stance), and the number of gait cycles walked |
 
 All views draw the pod in the ground frame, so a body pose (pitch, roll, height ...) is visible. The bottom of the
 window shows the gait engine's state (walking, transitioning or idle, velocity, cycle time, IK errors) and the running
@@ -50,7 +50,6 @@ Use pod 6 or 7 for the [CAD export](cad-export.md): the older pods are too small
 | `set_coxa_length <ALL \| leg> <mm>` | Also `set_femur_length` and `set_tibia_length` |
 | `set_coxa_angle <ALL \| leg> <degrees>` | Rest angle. Also `set_femur_angle` and `set_tibia_angle` |
 | `ground <height>` | Move all feet to Z = height (positive is down) and make that the rest stance |
-| `zero` | Set all servos to 0 degrees (every leg stretched out straight) |
 | `effectors` | Print the end effector (foot) positions |
 
 Changing the pod's geometry stops the gait engine and a running script.
@@ -96,7 +95,7 @@ See [scripts.md](scripts.md).
 | `abort` | Stop the running script and halt (a manual `walk` or `halt` does the same) |
 | `scripts` | List the scripts |
 
-### Servos, recording and CAD
+### Servos and CAD
 
 See [servos.md](servos.md) and [cad-export.md](cad-export.md).
 
@@ -109,7 +108,4 @@ See [servos.md](servos.md) and [cad-export.md](cad-export.md).
 | `servo ... offset <degrees>` | Added to the joint angle (horn mounting) |
 | `servo ... limits <min> <max>` | Soft limits in degrees |
 | `servo ... case <degrees>` / `axis_offset <mm>` | How the servo sits on its axis in the CAD export |
-| `record <on \| off>` | Record the servo angles while the pod moves. `off` discards the recording |
-| `export <file>` | Save the recording to `primitives/<file>` |
-| `debug` | Show how many servo angle sets have been recorded |
 | `export_cad <name>` | Export the pod in its rest pose to `cad/out/<name>.*` |

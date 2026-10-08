@@ -32,7 +32,6 @@ var helpSections = []helpSection{
 		"set_coxa_length <ALL | legNum> <length>    - Also set_femur_length and set_tibia_length",
 		"set_coxa_angle <ALL | legNum> <angle>      - Rest angle. Also set_femur_angle and set_tibia_angle",
 		"ground <height>                            - Move all feet to Z = height and make it the rest stance",
-		"zero                                       - Align all servos to zero degrees",
 		"effectors                                  - Output current end effector positions",
 	}},
 	{"walk", "Walking", []string{
@@ -59,16 +58,13 @@ var helpSections = []helpSection{
 		"abort                                      - Abort the running script and halt",
 		"scripts                                    - List scripts",
 	}},
-	{"servos", "Servos, recording and CAD export", []string{
+	{"servos", "Servos and CAD export", []string{
 		"servos                                     - Show the servo mapping",
 		"servo_model <AX-12A | STS3215 | XL-320>    - Select the servo type (default AX-12A)",
 		"servo <ALL | legNum> <coxa|femur|tibia> id <n> | invert <on|off> | offset <deg> | limits <min> <max>",
 		"                                             | case <deg> | axis_offset <mm>   (CAD: servo case rotation and horn offset)",
-		"record <on|off>                            - Record servo angles while moving (off discards)",
-		"export <file>                              - Save the recording, using the servo mapping",
 		"export_cad <name>                          - Export the pod in its rest pose to cad/out/<name>.json, and build",
 		"                                             <name>.step and .stl with CadQuery (see docs/cad-export.md)",
-		"debug                                      - Show how many servo angle sets have been recorded",
 	}},
 }
 

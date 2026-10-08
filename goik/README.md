@@ -7,7 +7,7 @@ Building and a quick start are in the [main README](../README.md). The documenta
 | [docs/simulator.md](docs/simulator.md) | Using the simulator: the views, the example pods and all shell commands |
 | [docs/gait-engine.md](docs/gait-engine.md) | How walking, gait transitions and the body pose work |
 | [docs/scripts.md](docs/scripts.md) | Motion scripts: chaining walks, turns, gait changes and poses |
-| [docs/servos.md](docs/servos.md) | Servo mapping, servo models, recording, and Dynamixel hardware |
+| [docs/servos.md](docs/servos.md) | Servo mapping, servo models and Dynamixel hardware |
 | [docs/cad-export.md](docs/cad-export.md) | Exporting a pod as a STEP assembly with printable brackets |
 | [docs/fusion-joints.md](docs/fusion-joints.md) | Moving the joints of an export in Fusion 360 |
 | [docs/servo-models.md](docs/servo-models.md) | Servo geometry and vendor models for the CAD export |

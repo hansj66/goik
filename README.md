@@ -19,7 +19,7 @@ It has so far been tested on Mac and Windows
 | [Using the simulator](./goik/docs/simulator.md) | The views, the example pods and all shell commands |
 | [The gait engine](./goik/docs/gait-engine.md) | How walking, gait transitions and the body pose work |
 | [Motion scripts](./goik/docs/scripts.md) | Chaining walks, turns, gait changes and poses in a script |
-| [Servos](./goik/docs/servos.md) | Servo mapping, servo models, recording, and Dynamixel hardware |
+| [Servos](./goik/docs/servos.md) | Servo mapping, servo models and Dynamixel hardware |
 | [CAD export](./goik/docs/cad-export.md) | Exporting a pod as a STEP assembly with printable brackets |
 | [Joints in Fusion 360](./goik/docs/fusion-joints.md) | Moving the joints of an export in Fusion 360 |
 | [Servo models](./goik/docs/servo-models.md) | Servo geometry and vendor models for the CAD export |
@@ -42,7 +42,7 @@ Navigate to the goik/goik folder and type:
 ```
 
 This will create an executable called "GOIK.exe" on Windows or "GOIK" on Mac and Linux. Run it from the goik/goik
-folder, since it looks for `scripts`, `pods`, `primitives` and `cad` relative to the current folder.
+folder, since it looks for `scripts`, `pods` and `cad` relative to the current folder.
 
 ### Make targets
 
@@ -133,7 +133,7 @@ halt                       # step back into the neutral stance
 
 Servo ids, orientation, offsets, soft limits and the servo model (AX-12A, STS3215, XL-320) are part of the pod
 definition and are saved with `save`. Use `servos` to show the mapping, and `servo` / `servo_model` to change it.
-The mapping is used when exporting recordings, and will be used by the robot controller. See [Servos](./goik/docs/servos.md).
+The mapping is used by the CAD export (servo ids and orientation), and will be used by the robot controller. See [Servos](./goik/docs/servos.md).
 
 ### CAD export
 
@@ -146,12 +146,8 @@ and 7 (`reset 6`, `reset 7`) are designed around AX-12A and STS3215 servos. The 
 
 ![Example pod 6 exported with export_cad, in Fusion 360](./goik/pictures/example_cad_export.png)
 
-The simulator allows for loading & saving of pods as well as recording of motion sequences (`record on`) and exporting them (`export`) as raw servo positions.
+Pod definitions can be saved and loaded with `save` and `load`.
 
-
-## Experimental stuff
-
-Recording and exporting motion primitives (`record` / `export`) is _experimental_. Earlier versions also streamed servo positions over UDP to an ESP32 based controller. That has been removed in favour of running the gait engine directly on the [Overlord](https://github.com/hansj66/overlord) controller (see the [design notes](./goik/docs/design-notes.md)).
 
 ## Future work
 

@@ -23,7 +23,6 @@ import (
 )
 
 const POD_FOLDER = "pods"
-const PRIMITIVES_FOLDER = "primitives"
 
 func (s *Shell) executeEffectorsCmd(args []string) error {
 	s.outputCh <- "Current end effector positions:"
@@ -355,32 +354,6 @@ func (s *Shell) executeLoadCmd(args []string) error {
 	return nil
 }
 
-func (s *Shell) executeZeroCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-	s.Pod.Zero()
-
-	return nil
-}
-
-func (s *Shell) executeRecordCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('record <filename>'): %+v", args)
-	}
-
-	if args[1] == "on" {
-		s.Pod.IsRecording = true
-	} else if args[1] == "off" {
-		s.Pod.IsRecording = false
-		s.Pod.ResetTicks()
-		s.Pod.ClearPrimitives()
-	} else {
-		return fmt.Errorf("syntax error ('record <on|off>'): %+v", args)
-	}
-	return nil
-}
-
 func folderExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -390,63 +363,6 @@ func folderExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-func (s *Shell) executeExportCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) == 4 {
-		return fmt.Errorf("servo range and orientation mask are now part of the servo mapping (see 'servos'). Use 'export <filename>'")
-	}
-	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('export <filename>'): %+v", args)
-	}
-
-	exists, err := folderExists(fmt.Sprintf("./%s", PRIMITIVES_FOLDER))
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		err := os.Mkdir(fmt.Sprintf("%s", PRIMITIVES_FOLDER), 0755)
-		if err != nil {
-			return err
-		}
-	}
-
-	if !s.Pod.IsRecording {
-		return fmt.Errorf("no recording started. nothing to export")
-	}
-
-	mapping := s.Pod.BodyDefinition.ServoMapping()
-	path := fmt.Sprintf("./%s/%s", PRIMITIVES_FOLDER, args[1])
-	clamped, err := s.Pod.MotionPrimitive.Export(path, mapping, s.Pod.BodyDefinition.NumLegs)
-	if err != nil {
-		return err
-	}
-
-	model := robot.ServoModels[mapping.Model]
-	s.outputCh <- fmt.Sprintf("Servo angles mapped for %s (%2.0f degrees, %d positions, midpoint %d)", model.Name, model.RangeDegrees, model.Resolution, model.Resolution/2)
-	if clamped > 0 {
-		s.outputCh <- fmt.Sprintf("WARNING: %d values were outside the servo range or limits and have been clamped", clamped)
-	}
-	s.outputCh <- fmt.Sprintf("Recording exported to : %s", path)
-
-	s.Pod.ClearPrimitives()
-
-	return nil
-}
-
-func (s *Shell) executeDebugCmd(args []string) error {
-	s.outputCh <- fmt.Sprintf("%+v", args)
-
-	if len(args) != 1 {
-		return fmt.Errorf("syntax error ('debug'): %+v", args)
-	}
-
-	s.Pod.Debug(fmt.Sprintf("Motion set size: %d", s.Pod.MotionPrimitive.Size()))
-
-	return nil
 }
 
 func (s *Shell) executeGroundCmd(args []string) error {

@@ -46,7 +46,7 @@ situations, **Low** = cosmetic, documentation or code hygiene.
 | 27 | Low | `commands.go:227` | **(fixed)** `go vet`: `Sprintf("Changing femur angle of leg %d to %2.2f", angle)` is missing the `legnum` argument. |
 | 28 | Low | `commands.go` `Dispatch` | **(fixed)** Prefix matching (`upload` runs `up`) and `strings.Split(cmd, " ")` (double spaces break the argument count). Use `strings.Fields` and an exact match on the first word. |
 | 29 | Low | `commands.go` help / README | **(help text fixed)** Help says `reset <1|2|3|4|5>`, but presets are 0–5. The root README's example session says "select model #3" and then runs `reset 1`. |
-| 30 | Low | `commands.go` `record off` | `record off` discards the recording, so you must `export` while still recording. Surprising: `record off` should stop recording and keep the data. |
+| 30 | Low | `commands.go` `record off` | **(obsolete: recording and export removed)** `record off` discards the recording, so you must `export` while still recording. Surprising: `record off` should stop recording and keep the data. |
 | 31 | Low | `simulator/shell.go` | Copyright banner says 2024; file headers say 2025. |
 
 ## Recording / export (`robot/motionPrimitive.go`)
@@ -56,7 +56,7 @@ situations, **Low** = cosmetic, documentation or code hygiene.
 | 32 | High | `motionPrimitive.go` `normalize`, `networkController.go` `Update` | **(verified, fixed)** No clamping. Angles outside ±range/2 convert a negative float to `uint16` (−200° → `0xFF56`) and command the servo to a garbage position. The inverted formula `1024 - x` produces 1024 at the end stop, which is out of range for 10-bit servos (0–1023). Both need clamping to `[0, 1023]` (and the mapping should be shared). |
 | 33 | High | `networkController.go` `Update` | **(obsolete: UDP streaming removed)** Checksum low byte is `uint8(checksum << 8)`, which is always 0. It should be `uint8(checksum & 0xFF)`. |
 | 34 | Medium | `networkController.go` | **(fixed: export uses the servo mapping, streaming removed)** Servo orientation was hard-coded in streaming, while `export` took a configurable range and mask. |
-| 35 | Medium | `motionPrimitive.go` | The exported file is raw servo words with no header: no leg count, frame period, servo range, start/end pose or version. A player has to assume 18 servos and a fixed playback rate. |
+| 35 | Medium | `motionPrimitive.go` | **(obsolete: recording and export removed)** The exported file is raw servo words with no header: no leg count, frame period, servo range, start/end pose or version. A player has to assume 18 servos and a fixed playback rate. |
 | 36 | Low | `cmd/dummyrobotserver.go` | **(obsolete: UDP streaming removed)** Hard-codes 6 legs / 39 bytes and ignores the checksum. |
 
 ## ESP32 firmware

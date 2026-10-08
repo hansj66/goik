@@ -16,7 +16,7 @@ The original gait (`stride_vector` / `stride_angle` / `start` / `stop` / `revert
 * **No notion of where a leg is in the gait.** All legs started at the middle of the table, so only tripod gait started
   cleanly.
 * **Recordings are joint angles with no metadata.** Two recordings can only be chained if one happens to end in the
-  exact pose the other starts in. (Still true for `export`.)
+  exact pose the other starts in.
 
 The gait engine replaces positions-by-index with the actual foot positions plus a phase per leg, and only lets commands
 change rates. See [gait-engine.md](gait-engine.md).
@@ -70,6 +70,8 @@ must not import `simulator` or `views`.
 * **Remote control:** gamepad left stick → x/y velocity, right stick → yaw, buttons → gait and halt. Plus the same UDP
   text commands as the shell. A watchdog halts the pod if the gamepad or remote goes quiet. The gamepad code should
   be shared with the simulator (see the roadmap).
+* **Calibration:** a command that sets every servo to 0 degrees (every leg stretched out straight), to check that the
+  horns are mounted at their zero positions before walking.
 * **Testing without hardware:** the control loop writes to a `ServoBus` interface. The real implementation is the
   UART. A fake records the frames, so the whole program can be tested on a PC.
 
@@ -106,7 +108,7 @@ Also tracked as #44–#47 in [BUGS.md](../BUGS.md).
 
 * ~~Overlord as the primary target~~: yes. The ESP32 firmware and UDP streaming have been removed.
 * ~~Which servos~~: AX-12A first (protocol 1.0), with the STS3215 as a protocol compatible option.
-* **Clip space:** joint angles (simple, what `export` produces today) or foot positions (survive geometry changes,
+* **Clip space:** joint angles (simple) or foot positions (survive geometry changes,
   need IK on the robot, which Overlord has).
 * **Remote:** the Bluetooth gamepad on Overlord covers direct control. Is a network remote (phone, PC) also needed? If
   so, UDP text commands are probably enough.

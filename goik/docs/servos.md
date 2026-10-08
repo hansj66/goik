@@ -31,15 +31,6 @@ Raw servo positions are always clamped to the servo's range.
 
 The CAD geometry of the models is described in [servo-models.md](servo-models.md).
 
-## Recording
-
-`record on` records the servo angles on every gait engine tick (20 ms) while the pod moves; `export <file>` writes the
-recording to `primitives/<file>`. `record off` discards the recording, so export first.
-
-The file is raw servo positions: 2 bytes per servo (little endian), in leg order (coxa, femur, tibia of leg 0, then
-leg 1 ...), one frame per 20 ms. The positions are mapped and clamped by the servo mapping. The file has no header,
-so the player has to know the number of servos and the frame period.
-
 ## Hardware
 
 ### Dynamixel servos

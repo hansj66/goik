@@ -161,15 +161,3 @@ func NewLeg(
 
 	return &l
 }
-
-// Zero resets all servo angles in the leg to 0 degrees. This should result in the pod having all legs stretched
-// out and each leg forming a straight line away from the robot body
-// If it does not, you will have to mechanically adjust the robot body so that this condition is
-// satisfied.
-// This is a prerequisit for the FK/IK math to make sense in meat space ;)
-func (l *Leg) Zero() {
-	l.ServoAngles.Coxa = 0
-	l.ServoAngles.Femur = 0
-	l.ServoAngles.Tibia = 0
-	l.RecalculateForwardKinematics(l.ServoAngles)
-}
