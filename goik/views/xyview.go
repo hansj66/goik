@@ -25,10 +25,7 @@ import (
 )
 
 type XyView struct {
-	x            float32
-	y            float32
-	size         float32
-	legendOffset float32
+	frame
 	// Recent foot positions per leg
 	trails [][]robot.Coordinate
 	// The body's path in world coordinates, and the gait engine it was recorded from
@@ -36,16 +33,16 @@ type XyView struct {
 	pathEngine *robot.GaitEngine
 }
 
-func NewXyView(x float32, y float32, size float32) *XyView {
-	return &XyView{x: x, y: y, size: size, legendOffset: 10}
+func NewXyView(x float32, y float32, width float32, height float32) *XyView {
+	return &XyView{frame: newFrame(x, y, width, height)}
 }
 
 func (v *XyView) TranslateX(x float64) int {
-	return int(v.x) + int(v.size)/2 - int(v.legendOffset) + int(x)
+	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x)
 }
 
 func (v *XyView) TranslateY(y float64) int {
-	return int(v.y) + int(v.size)/2 - int(v.legendOffset) + int(y)
+	return int(v.y) + int(v.height)/2 - int(v.legendOffset) + int(y)
 }
 
 // Number of positions kept per foot for the trail
@@ -57,12 +54,12 @@ const PATH_RESOLUTION = 2.0
 
 func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 
-	DrawFrame(screen, "XY View ", v.size, v.x, v.y, v.legendOffset)
+	DrawFrame(screen, "XY View ", v.width, v.height, v.x, v.y, v.legendOffset)
 	joints := p.GroundJoints()
 	n := p.BodyDefinition.NumLegs
 
 	// Ground grid and the body's path. They are fixed in the world, so they move as the pod walks
-	clip := Clip(screen, v.x, v.y, v.size)
+	clip := Clip(screen, v.x, v.y, v.width, v.height)
 	var gridLines [][][2]float32
 	for _, l := range GroundGrid(p) {
 		gridLines = append(gridLines, [][2]float32{

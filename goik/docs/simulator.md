@@ -7,6 +7,12 @@ It opens a window with four views and a command shell in the terminal. Type comm
 all, and `help <section>` shows one section (design, walk, pose, scripts, servos). `/quit` closes both the shell and
 the window, and closing the window ends the shell.
 
+At start up the views window fills the left 2/3 of the screen (without the taskbar), and the terminal with the shell
+the right 1/3, with the focus on the shell. The terminal is only moved on Windows, and only if it is a terminal window
+(Windows Terminal or the classic console): started from an editor's terminal (VS Code's, for example), only the views
+window is placed. `GOIK -layout=false` (or `go run . -layout=false`) leaves both windows where they open. The views
+window can be resized, and the views always fill it.
+
 ## The views
 
 | View | Shows |
@@ -20,7 +26,8 @@ All views draw the pod in the ground frame, so a body pose (pitch, roll, height 
 window shows the gait engine's state (walking, transitioning or idle, velocity, cycle time, IK errors) and the running
 script's current line.
 
-The scale is fixed at 1 pixel per mm.
+The views are drawn at 1 pixel per mm on a picture with the window's shape and 1024 pixels along its shorter side,
+which is scaled to fill the window. A wider window shows more of the ground around the pod.
 
 ## Example pods
 

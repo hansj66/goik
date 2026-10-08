@@ -22,26 +22,23 @@ import (
 )
 
 type XzView struct {
-	x            float32
-	y            float32
-	size         float32
-	legendOffset float32
+	frame
 }
 
-func NewXzView(x float32, y float32, size float32) *XzView {
-	return &XzView{x: x, y: y, size: size, legendOffset: 10}
+func NewXzView(x float32, y float32, width float32, height float32) *XzView {
+	return &XzView{frame: newFrame(x, y, width, height)}
 }
 
 func (v *XzView) TranslateX(x float64) int {
-	return int(v.x) + int(v.size)/2 - int(v.legendOffset) + int(x)
+	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x)
 }
 
 func (v *XzView) TranslateY(y float64) int {
-	return int(v.size)/2 - int(v.legendOffset) + int(y)
+	return int(v.y) + int(v.height)/2 - int(v.legendOffset) + int(y)
 }
 
 func (v *XzView) Render(screen *ebiten.Image, p *robot.Pod) {
-	DrawFrame(screen, "XZ View", v.size, v.x, v.y, v.legendOffset)
+	DrawFrame(screen, "XZ View", v.width, v.height, v.x, v.y, v.legendOffset)
 	joints := p.GroundJoints()
 
 	// Draw body frame

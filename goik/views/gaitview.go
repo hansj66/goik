@@ -25,22 +25,19 @@ import (
 )
 
 type GaitView struct {
-	x            float32
-	y            float32
-	size         float32
-	legendOffset float32
+	frame
 }
 
-func NewGaitView(x float32, y float32, size float32) *GaitView {
-	return &GaitView{x: x, y: y, size: size, legendOffset: 10}
+func NewGaitView(x float32, y float32, width float32, height float32) *GaitView {
+	return &GaitView{frame: newFrame(x, y, width, height)}
 }
 
 func (v *GaitView) TranslateX(x float64) int {
-	return int(v.x) + int(v.size)/2 - int(v.legendOffset) + int(x)
+	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x)
 }
 
 func (v *GaitView) TranslateY_TopView(y float64) int {
-	return int(v.y) + int(v.size)/4 - int(v.legendOffset) + int(y)
+	return int(v.y) + int(v.height)/4 - int(v.legendOffset) + int(y)
 }
 
 func (v *GaitView) RenderGait(screen *ebiten.Image, legend string, x_legend float32, x_table float32, y float32, p *robot.Pod) {
@@ -82,7 +79,7 @@ func (v *GaitView) Render(screen *ebiten.Image, p *robot.Pod) {
 	var x_offset float32 = v.x + v.legendOffset + 40
 	var pattern_offset float32 = 60
 
-	y_offset += v.size / 5
+	y_offset += v.height / 5
 	v.RenderGait(screen,
 		fmt.Sprintf("%s - Phase: white == swing, grey == stance", p.BodyDefinition.Gait.Name),
 		x_offset,

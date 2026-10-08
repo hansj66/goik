@@ -138,19 +138,39 @@ func GroundGrid(p *robot.Pod) [][2][2]float64 {
 }
 
 // Clip returns the part of the screen covered by a view. Drawing on it is clipped to the view.
-func Clip(screen *ebiten.Image, x float32, y float32, size float32) *ebiten.Image {
-	return screen.SubImage(image.Rect(int(x), int(y), int(x+size), int(y+size))).(*ebiten.Image)
+func Clip(screen *ebiten.Image, x float32, y float32, width float32, height float32) *ebiten.Image {
+	return screen.SubImage(image.Rect(int(x), int(y), int(x+width), int(y+height))).(*ebiten.Image)
 }
 
 type View interface {
 	Render(screen *ebiten.Image, p *robot.Pod)
+	// SetBounds moves the view to another part of the screen (when the window changes shape)
+	SetBounds(x float32, y float32, width float32, height float32)
+}
+
+// frame is the part of the screen a view draws in. The views draw at 1 pixel per mm, centred in their frame.
+type frame struct {
+	x            float32
+	y            float32
+	width        float32
+	height       float32
+	legendOffset float32
+}
+
+func newFrame(x float32, y float32, width float32, height float32) frame {
+	return frame{x: x, y: y, width: width, height: height, legendOffset: 10}
+}
+
+// SetBounds moves the view to another part of the screen
+func (f *frame) SetBounds(x float32, y float32, width float32, height float32) {
+	f.x, f.y, f.width, f.height = x, y, width, height
 }
 
 type RenderViews []View
 
-func DrawFrame(screen *ebiten.Image, title string, size float32, x float32, y float32, titleOffset float32) {
+func DrawFrame(screen *ebiten.Image, title string, width float32, height float32, x float32, y float32, titleOffset float32) {
 	framecolor := color.RGBA{64, 64, 64, 1}
-	vector.StrokeRect(screen, x, y, size, size, 2, framecolor, false)
+	vector.StrokeRect(screen, x, y, width, height, 2, framecolor, false)
 	ebitenutil.DebugPrintAt(screen, title, int(x+titleOffset), int(y)+int(titleOffset))
 }
 

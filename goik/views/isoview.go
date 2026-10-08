@@ -24,26 +24,23 @@ import (
 )
 
 type IsoView struct {
-	x            float32
-	y            float32
-	size         float32
-	legendOffset float32
+	frame
 }
 
-func NewIsoView(x float32, y float32, size float32) *IsoView {
-	return &IsoView{x: x, y: y, size: size, legendOffset: 10}
+func NewIsoView(x float32, y float32, width float32, height float32) *IsoView {
+	return &IsoView{frame: newFrame(x, y, width, height)}
 }
 
 func (v *IsoView) TranslateX(x float64) int {
-	return int(v.x) + int(v.size)/2 - int(v.legendOffset) + int(x)
+	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x)
 }
 
 func (v *IsoView) TranslateY(y float64) int {
-	return int(v.y) + int(v.size)/2 - int(v.legendOffset) + int(y)
+	return int(v.y) + int(v.height)/2 - int(v.legendOffset) + int(y)
 }
 
 func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
-	DrawFrame(screen, "Isometric View", v.size, v.x, v.y, v.legendOffset)
+	DrawFrame(screen, "Isometric View", v.width, v.height, v.x, v.y, v.legendOffset)
 	joints := p.GroundJoints()
 
 	angle_z := 0 * math.Pi / 180.0
@@ -98,7 +95,7 @@ func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 	for _, l := range GroundGrid(p) {
 		gridLines = append(gridLines, [][2]float32{project(l[0][0], l[0][1], groundZ), project(l[1][0], l[1][1], groundZ)})
 	}
-	StrokePaths(Clip(screen, v.x, v.y, v.size), gridLines, 1, GridClr())
+	StrokePaths(Clip(screen, v.x, v.y, v.width, v.height), gridLines, 1, GridClr())
 
 	var IsoJoints = make([][robot.NUM_JOINTS]robot.Coordinate, p.BodyDefinition.NumLegs*robot.NUM_JOINTS)
 

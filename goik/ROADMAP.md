@@ -37,7 +37,7 @@
     1. Phase dials: each leg's current phase compared to the phase its gait wants (shows legs re-timing during gait transitions)
     1. Support polygon, centre of gravity and stability margin (green to red) in the XY view
     1. Reach circles around the neutral foot positions. Colour stance feet as they approach the edge of their reach
-    1. Camera controls: zoom and pan (scale is fixed at 1 px = 1 mm), rotatable isometric view with a ground plane
+    1. Camera controls: zoom and pan (the views are drawn at a fixed 1 px = 1 mm on a picture 1024 px along its shorter side, then scaled to the window), rotatable isometric view with a ground plane
     1. Pause and single-step (e.g. space / period key) for inspecting transitions frame by frame
     1. Joint angle panel: each servo's angle against its limits from the servo mapping, highlighting joints near or past a limit
     1. Fix view colours: alpha is 1 instead of 255 (e.g. RGBA{255, 0, 0, 1}), which is invalid for Ebiten's premultiplied colours

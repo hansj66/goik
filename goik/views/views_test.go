@@ -33,7 +33,7 @@ func BenchmarkRender(b *testing.B) {
 	p.Engine = e
 	e.SetTwist(robot.Twist{Y: 60, Yaw: 10})
 
-	xy := NewXyView(512, 0, 512)
+	xy := NewXyView(512, 0, 512, 512)
 	// Walk for a while to fill the foot trails
 	for i := 0; i < 600; i++ {
 		p.Update()
@@ -44,10 +44,10 @@ func BenchmarkRender(b *testing.B) {
 		name string
 		view View
 	}{
-		{"xz", NewXzView(0, 0, 512)},
+		{"xz", NewXzView(0, 0, 512, 512)},
 		{"xy", xy},
-		{"iso", NewIsoView(512, 512, 512)},
-		{"gait", NewGaitView(0, 512, 512)},
+		{"iso", NewIsoView(512, 512, 512, 512)},
+		{"gait", NewGaitView(0, 512, 512, 512)},
 	} {
 		b.Run(v.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {

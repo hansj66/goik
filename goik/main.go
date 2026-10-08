@@ -16,10 +16,13 @@ package main
 
 import (
 	"GOIK/simulator"
+	"flag"
 )
 
 func main() {
 	// go tool pprof cpu.pprof
 	// defer profile.Start(profile.ProfilePath(".")).Stop()
-	simulator.Run()
+	layout := flag.Bool("layout", true, "place the views window on the left 2/3 of the screen and the terminal on the right 1/3")
+	flag.Parse()
+	simulator.Run(*layout)
 }
