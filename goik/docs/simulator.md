@@ -85,9 +85,41 @@ See [gait-engine.md](gait-engine.md) for how walking works.
 | `gait <tripod \| ripple \| wave>` | Select the gait. Blends into the new gait while walking |
 | `swing_time <seconds>` | Duration of a leg swing (default 0.4). The cycle time follows from it |
 | `step_height <mm>` | Height of the swing arc |
-| `speed <1-10>` | Simulation speed. At 10 the simulation runs at about real time; lower values are slow motion |
+| `speed <1-10>` | Simulation speed. At 10 (the default) the simulation runs at about real time; lower values are slow motion |
 | `engine` | Print the gait engine state: velocity, stride, cycle time, body pose, distance travelled, leg phases, IK errors |
 | `clear` | Clear the body path and foot trails in the XY view |
+| `gamepad [on \| off]` | Show the gamepad's state and mapping, or turn gamepad control on or off. See [Gamepad](#gamepad) |
+
+### Gamepad
+
+The pod can be driven with a gamepad: an Xbox controller, or any gamepad with the standard layout. Plug it in (or pair
+it) before or after starting the simulator. The bottom of the window shows its state.
+
+| Control | Does |
+|---|---|
+| Left stick | Walk: push direction is the walking direction, deflection the speed |
+| Right stick left / right | Turn (yaw rate, up to 45 degrees/s). Right turns right |
+| Right stick up / down | Pitch: up tilts the nose down, down tilts it up (up to 15 degrees) |
+| LT / RT | Roll left / right: lowers that side (up to 15 degrees) |
+| D-pad up / down | Top speed (the speed at full deflection): 25, 50, 75 (at start), 100 or 150 mm/s |
+| D-pad left / right | Body 10 mm lower / higher |
+| A / X / Y | Tripod / ripple / wave gait |
+| B | Halt: stop walking until the sticks are released |
+| Menu | Level: back to the neutral body pose (pitch, roll, height and the shell's pose commands) |
+| View | Gamepad control on / off |
+
+Directions are the robot's own: left stick right walks to the robot's right. The XY view shows the pod from above with
+its front (+Y) at the bottom, so walking forward moves it down the screen, and the robot's right is to the left on the
+screen.
+
+The sticks have a dead zone (15%), and a response curve that gives fine control near the centre. Pitch and roll follow
+the stick and triggers and spring back to level when they are released; the gait engine ramps the pose smoothly.
+
+Using a stick, trigger or button takes over from a running script (it is stopped). When everything is released, the pod
+stops walking, levels its pitch and roll, and the shell's commands work as before. If the gamepad is disconnected while
+driving, the pod halts.
+
+The gamepad is read while the terminal has the focus too, so the shell and the gamepad can be used together.
 
 ### Body pose
 

@@ -90,7 +90,6 @@ Type `help` in the command shell to get a list of commands, or `help <section>` 
 >set_coxa_length 5 100
 >set_coxa_angle 4 -30
 >set_coxa_angle 5 30
->speed 10
 >gait ripple
 >walk 0 30 0 cycles 4
 >walk 0 50 15
@@ -111,12 +110,15 @@ The `walk` command drives a phase based gait engine. Velocity, direction, gait a
 
 ```sh
 >reset 1
->speed 10
 >walk 0 80 0
 >gait wave
 >walk 0 50 15
 >halt
 ```
+
+The pod can also be driven with an Xbox controller (or any gamepad with the standard layout): the left stick walks,
+the right stick turns and pitches, the triggers roll, and the buttons select the gait and top speed. See
+[Gamepad](./goik/docs/simulator.md#gamepad) for the whole mapping.
 
 Sequences of motions can be written as [scripts](./goik/docs/scripts.md) in the `goik/scripts` folder and played
 with `run <name>` (`scripts` lists them, `abort` stops the running script). See [demo.goik](./goik/scripts/demo.goik):

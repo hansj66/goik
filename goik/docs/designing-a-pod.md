@@ -358,8 +358,8 @@ stance 130 80
 * `servo_model <AX-12A | STS3215 | XL-320>` selects the servos. The joint range checks of the stance use it. See
   [servos.md](servos.md) for the servo mapping (ids, offsets, soft limits).
 * `save <name>` stores the pod in `pods/<name>`, with its design, stance and servo mapping. `load <name>` loads it.
-* Walk it: `walk 0 60 0`, `walk 0 0 20` (turn), `gait wave`, `halt`. See [simulator.md](simulator.md) and
-  [scripts.md](scripts.md).
+* Walk it: `walk 0 60 0`, `walk 0 0 20` (turn), `gait wave`, `halt`, or drive it with a gamepad. See
+  [simulator.md](simulator.md) and [scripts.md](scripts.md).
 * `export_cad <name>` exports it to a STEP assembly with printable brackets, and checks the rest pose for collisions
   between the servos and brackets. See [cad-export.md](cad-export.md).
 

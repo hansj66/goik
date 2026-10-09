@@ -15,6 +15,7 @@
 package simulator
 
 import (
+	"GOIK/control"
 	"GOIK/robot"
 	"GOIK/script"
 	"log"
@@ -36,6 +37,10 @@ type Shell struct {
 	Script *script.Runner
 	// The engine the script was started on
 	scriptEngine *robot.GaitEngine
+	// Gamepad turns gamepad input into gait engine commands (see gamepad.go)
+	Gamepad *control.Controller
+	// The last gamepad error reported, so it is only reported once
+	gamepadError string
 	// mu protects Pod and Script. Commands run on the shell goroutine, while
 	// Ebiten updates and draws on its own goroutine
 	mu sync.Mutex
@@ -49,7 +54,7 @@ type Shell struct {
 func NewShell(pod *robot.Pod) *Shell {
 	// The command channel is buffered, since the chat UI sends commands from its event loop and
 	// would freeze until the previous command has been dispatched
-	s := Shell{Pod: pod, outputCh: make(chan string, 100), commandCh: make(chan string, 16), done: make(chan struct{})}
+	s := Shell{Pod: pod, Gamepad: control.NewController(), outputCh: make(chan string, 100), commandCh: make(chan string, 16), done: make(chan struct{})}
 
 	s.Pod.SetDebugChannel(s.outputCh)
 
@@ -89,6 +94,7 @@ func NewShell(pod *robot.Pod) *Shell {
 		"servos":           s.executeServosCmd,
 		"servo":            s.executeServoCmd,
 		"servo_model":      s.executeServoModelCmd,
+		"gamepad":          s.executeGamepadCmd,
 	}
 
 	return &s

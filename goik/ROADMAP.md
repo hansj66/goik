@@ -43,10 +43,8 @@
     1. Fix view colours: alpha is 1 instead of 255 (e.g. RGBA{255, 0, 0, 1}), which is invalid for Ebiten's premultiplied colours
     1. Scale bar / units on the axes
 1. Implement metachronal gait (for centipede type robots)
-1. Gamepad control for test driving the pod in the simulator, sharing the code with the Overlord controller
-    1. Input independent controller package (no Ebiten dependency, so it runs on Overlord): maps stick axes and buttons to gait engine commands. Left stick: x/y velocity, right stick: yaw rate. Buttons: cycle gait, halt, level. Dead zone, response curve (expo) and maximum speeds; the engine's acceleration limits keep it smooth
-    1. Pose mode while a button is held: the sticks control body pitch, roll, yaw and height instead of walking
-    1. Simulator input: Ebiten's gamepad API (standard gamepad layout, works on Windows, macOS and Linux)
-    1. Overlord input: Linux joystick device `/dev/input/js0` (Bluetooth gamepad, as in the Overlord remote control example)
-    1. Configurable button and axis mapping (gamepads differ), and the current stick and button state shown in the simulator
-    1. Watchdog: halt if the input stops (gamepad disconnected or out of range). Essential on the real robot
+1. Gamepad control: the simulator can be driven with a gamepad (see [docs/simulator.md](docs/simulator.md#gamepad)), using the input independent `control` package. Still to do:
+    1. Overlord input: Linux joystick device `/dev/input/js0` (Bluetooth gamepad, as in the Overlord remote control example), feeding the same `control` package
+    1. Watchdog on Overlord: halt if the input goes quiet (out of range), not only on a disconnect
+    1. Pose mode while a button is held: the sticks shift the body (x, y) and turn it (yaw) instead of walking
+    1. Configurable button and axis mapping (gamepads differ), and the stick and button state shown in the simulator

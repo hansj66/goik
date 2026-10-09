@@ -61,7 +61,8 @@ func (g *Game) arrangeViews(width int, height int) {
 	g.width, g.height = width, height
 }
 
-var DELAY_COUNTER int = 10
+// The gait engine advances every 3 * DELAY_COUNTER frames. 0 (speed 10, the default) is every frame: about real time
+var DELAY_COUNTER int = 0
 var counter int = 0
 
 func (g *Game) Update() error {
@@ -79,8 +80,12 @@ func (g *Game) Update() error {
 		g.layout = nil
 	}
 
+	gamepad := readGamepad()
+
 	g.Shell.mu.Lock()
 	defer g.Shell.mu.Unlock()
+
+	g.Shell.applyGamepad(gamepad)
 
 	counter++
 	if counter >= 3*DELAY_COUNTER {
@@ -122,6 +127,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.Shell.Script != nil {
 		ebitenutil.DebugPrintAt(screen, "Script: "+g.Shell.Script.Status(), 20, g.height-40)
 	}
+	ebitenutil.DebugPrintAt(screen, g.Shell.Gamepad.Status(), 20, g.height-80)
 }
 
 // Layout gives the views a screen with the window's shape, with its shorter side window_size pixels. The views draw

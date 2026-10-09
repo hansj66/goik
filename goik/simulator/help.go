@@ -58,9 +58,10 @@ var helpSections = []helpSection{
 		"gait <tripod | ripple | wave>              - Select gait (blends smoothly while walking)",
 		"swing_time <seconds>                       - Duration of a leg swing (default 0.4)",
 		"step_height <mm>                           - Height of the swing arc",
-		"speed <1-10>                               - Simulation speed (10 is real time)",
+		"speed <1-10>                               - Simulation speed (10, the default, is real time)",
 		"engine                                     - Show the gait engine state",
 		"clear                                      - Clear the body path and foot trails in the XY view",
+		"gamepad [on | off]                         - Drive with a gamepad (Xbox layout): show the mapping, or turn it on/off",
 	}},
 	{"pose", "Body pose (while standing or walking)", []string{
 		"pitch <deg>                                - Positive raises the front (+Y)",
