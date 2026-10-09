@@ -74,10 +74,23 @@ func TestDeadZoneAndRelease(t *testing.T) {
 	c := NewController()
 	c.Update(connected())
 
-	// A resting stick doesn't creep
-	if cmd := c.Update(withAxis(connected(), LeftStickY, -0.1)); cmd.Drive || cmd.TakeOver {
-		t.Errorf("a stick inside the dead zone drives: %+v", cmd)
+	// A resting stick doesn't creep, also with some drift (a real pad's right stick rested at 0.17)
+	drift := withAxis(withAxis(withAxis(connected(), LeftStickX, -0.04), LeftStickY, 0.05), RightStickY, 0.17)
+	drift = withAxis(drift, RightStickX, 0.03)
+	if cmd := c.Update(drift); cmd.Drive || cmd.TakeOver {
+		t.Errorf("a drifting stick drives: %+v", cmd)
 	}
+	// ... nor does a trigger that hasn't been pressed in
+	if cmd := c.Update(withAxis(connected(), LeftTrigger, 0.1)); cmd.Drive || cmd.TakeOver {
+		t.Errorf("a trigger inside the dead zone drives: %+v", cmd)
+	}
+
+	// Turning with the right stick doesn't pitch from the other axis's drift
+	if cmd := c.Update(withAxis(drift, RightStickX, 1)); cmd.Pitch != 0 || !near(cmd.Twist.Yaw, 45) {
+		t.Errorf("turning with drift: %+v, want yaw 45 without pitch", cmd)
+	}
+	c.Update(connected())
+	c.Update(connected())
 
 	// Take over once, keep driving, then stop and level once when released
 	walk := withAxis(withAxis(connected(), LeftStickY, -1), RightStickY, 1)

@@ -112,7 +112,9 @@ Directions are the robot's own: left stick right walks to the robot's right. The
 its front (+Y) at the bottom, so walking forward moves it down the screen, and the robot's right is to the left on the
 screen.
 
-The sticks have a dead zone (15%), and a response curve that gives fine control near the centre. Pitch and roll follow
+The sticks have a 25% dead zone and the triggers 15%, so a stick that rests slightly off centre doesn't move the pod.
+`gamepad` shows the raw stick, trigger and button values, to check a pad. A response curve gives fine control near
+the centre. Pitch and roll follow
 the stick and triggers and spring back to level when they are released; the gait engine ramps the pose smoothly.
 
 Using a stick, trigger or button takes over from a running script (it is stopped). When everything is released, the pod

@@ -82,6 +82,32 @@ type GamepadState struct {
 	Buttons   [NumButtons]bool
 }
 
+var axisNames = [NumAxes]string{"left stick x", "left stick y", "right stick x", "right stick y", "LT", "RT"}
+var buttonNames = [NumButtons]string{"A", "B", "X", "Y", "Menu", "View", "D-pad up", "D-pad down", "D-pad left", "D-pad right"}
+
+// String shows the raw axis values and the buttons that are down
+func (s GamepadState) String() string {
+	text := ""
+	for a, v := range s.Axes {
+		text += fmt.Sprintf("%s %.2f, ", axisNames[a], v)
+	}
+	down := ""
+	for b, pressed := range s.Buttons {
+		if pressed {
+			down += " " + buttonNames[b]
+		}
+	}
+	if down == "" {
+		down = " none"
+	}
+	return text + "buttons down:" + down
+}
+
+// State returns the gamepad state from the last update
+func (c *Controller) State() GamepadState {
+	return c.previous
+}
+
 // Command is what the controller wants done after a gamepad update
 type Command struct {
 	// The controller takes over from scripts (stop the running script)
@@ -105,8 +131,12 @@ type Command struct {
 type Controller struct {
 	// Off: the gamepad is ignored, except for the button that turns it on again
 	Enabled bool
-	// Stick and trigger values within the dead zone are 0
-	DeadZone float64
+	// Dead zones: smaller stick deflections and trigger values are 0. Sticks often rest slightly off centre (one
+	// test pad's right stick rests at 0.17), so the sticks' dead zone is close to Microsoft's XInput recommendation
+	// (0.24 to 0.27). The left stick's dead zone is radial (on the stick's deflection, so walking directions stay
+	// smooth); the right stick's is per axis, since its axes do unrelated things (turn and pitch)
+	StickDeadZone   float64
+	TriggerDeadZone float64
 	// Response curve: 0 is linear, 1 is cubic (fine control near the centre)
 	Expo float64
 	// Top speeds (mm/s) selected with the D-pad, and the selected one
@@ -129,7 +159,8 @@ type Controller struct {
 func NewController() *Controller {
 	return &Controller{
 		Enabled:    true,
-		DeadZone:   0.15,
+		StickDeadZone:   0.25,
+		TriggerDeadZone: 0.15,
 		Expo:       0.6,
 		SpeedSteps: []float64{25, 50, 75, 100, 150},
 		speed:      2,
@@ -167,15 +198,25 @@ func (c *Controller) Status() string {
 	return fmt.Sprintf("Gamepad: %s, top speed %.0f mm/s, %s", s.Name, c.TopSpeed(), state)
 }
 
-// shape applies the dead zone and the response curve to an axis value
-func (c *Controller) shape(v float64) float64 {
+// shape applies a dead zone and the response curve to an axis value
+func (c *Controller) shape(v float64, deadZone float64) float64 {
 	a := math.Abs(v)
-	if a <= c.DeadZone {
+	if a <= deadZone {
 		return 0
 	}
-	n := math.Min((a-c.DeadZone)/(1-c.DeadZone), 1)
+	n := math.Min((a-deadZone)/(1-deadZone), 1)
 	n = (1-c.Expo)*n + c.Expo*n*n*n
 	return math.Copysign(n, v)
+}
+
+// shapeStick applies the dead zone and the response curve to a stick's deflection, keeping its direction
+func (c *Controller) shapeStick(x float64, y float64) (float64, float64) {
+	m := math.Hypot(x, y)
+	if m <= c.StickDeadZone {
+		return 0, 0
+	}
+	n := c.shape(m, c.StickDeadZone)
+	return x / m * n, y / m * n
 }
 
 // release stops the pod and levels its pitch and roll, and hands control back
@@ -256,9 +297,9 @@ func (c *Controller) Update(s GamepadState) Command {
 	}
 
 	// Sticks and triggers
-	lx, ly := c.shape(s.Axes[LeftStickX]), c.shape(s.Axes[LeftStickY])
-	rx, ry := c.shape(s.Axes[RightStickX]), c.shape(s.Axes[RightStickY])
-	lt, rt := c.shape(s.Axes[LeftTrigger]), c.shape(s.Axes[RightTrigger])
+	lx, ly := c.shapeStick(s.Axes[LeftStickX], s.Axes[LeftStickY])
+	rx, ry := c.shape(s.Axes[RightStickX], c.StickDeadZone), c.shape(s.Axes[RightStickY], c.StickDeadZone)
+	lt, rt := c.shape(s.Axes[LeftTrigger], c.TriggerDeadZone), c.shape(s.Axes[RightTrigger], c.TriggerDeadZone)
 	centred := lx == 0 && ly == 0 && rx == 0 && ry == 0 && lt == 0 && rt == 0
 	if c.halted && centred {
 		c.halted = false

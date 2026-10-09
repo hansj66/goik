@@ -141,6 +141,9 @@ func (s *Shell) executeGamepadCmd(args []string) error {
 	}
 
 	s.outputCh <- s.Gamepad.Status()
+	if state := s.Gamepad.State(); state.Connected {
+		s.outputCh <- "Raw input: " + state.String()
+	}
 	for _, line := range gamepadMapping {
 		s.outputCh <- "\t" + line
 	}
