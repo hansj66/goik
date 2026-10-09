@@ -39,7 +39,7 @@ import sys
 
 import cadquery as cq
 import numpy as np
-from OCP.gp import gp_Trsf
+from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf
 
 import brackets
 
@@ -116,6 +116,47 @@ def collisions(parts):
             if volume > 0.5:
                 found.append((volume, shapes[i][0], shapes[j][0]))
     return sorted(found, reverse=True)
+
+
+# Coxa angles (degrees) the neighbouring legs are turned towards each other in coxa_clearance
+COXA_SWEEP = range(5, 50, 5)
+# Less room than this (degrees) is tight: the coxas typically turn 15 to 20 degrees while walking
+TIGHT_COXA_CLEARANCE = 20
+
+
+def coxa_clearance(parts, assembly):
+    """How far the coxas of neighbouring legs can turn towards each other before their parts collide.
+
+    The legs' parts (everything of a leg except its coxa servo, which belongs to the body) turn about the coxa axis.
+    Returns (largest clear angle, None) or (largest clear angle, (angle, leg a, leg b, part a, part b)) for the first
+    collision"""
+    legs = assembly["legs"]
+    moving = {leg["index"]: [(name, part.val() if hasattr(part, "val") else part) for name, part in parts
+                             if name.startswith(f"leg{leg['index']}_") and "coxa_servo" not in name] for leg in legs}
+
+    def direction(leg):
+        p = leg["points"]
+        return math.atan2(p[1][1] - p[0][1], p[1][0] - p[0][0])
+
+    def turned(leg, degrees):
+        """The leg's parts turned about its (vertical) coxa axis, counter clockwise seen from above"""
+        origin = leg["points"][0]
+        t = gp_Trsf()
+        t.SetRotation(gp_Ax1(gp_Pnt(*origin), gp_Dir(0, 0, 1)), math.radians(degrees))
+        return [(name, shape.moved(cq.Location(t))) for name, shape in moving[leg["index"]]]
+
+    clear = 0
+    for angle in COXA_SWEEP:
+        for i in range(len(legs)):
+            a, b = legs[i], legs[(i + 1) % len(legs)]
+            towards = 1 if math.sin(direction(b) - direction(a)) > 0 else -1
+            hits = collisions(turned(a, towards * angle) + turned(b, -towards * angle))
+            hits = [h for h in hits if h[1].split("_")[0] != h[2].split("_")[0]]
+            if hits:
+                volume, x, y = hits[0]
+                return clear, (angle, a["index"], b["index"], x, y)
+        clear = angle
+    return clear, None
 
 
 def print_frame(part, frame):
@@ -349,6 +390,14 @@ def main():
                 print(f"    {a} and {b}: {volume:.1f} mm^3")
         else:
             print("No collisions in the rest pose")
+            clear, hit = coxa_clearance(parts, assembly)
+            if hit is None:
+                print(f"Neighbouring legs: clear while their coxas turn {clear} degrees towards each other")
+            else:
+                angle, a, b, x, y = hit
+                hint = " A larger body gives the legs more room (design scale)." if clear < TIGHT_COXA_CLEARANCE else ""
+                print(f"Neighbouring legs: clear while their coxas turn {clear} degrees towards each other. "
+                      f"Legs {a} and {b} collide at {angle} degrees ({x} and {y}).{hint}")
     if args.assembly_stl:
         cq.exporters.export(assy.toCompound(), base + ".stl")
         print("Wrote", base + ".stl")

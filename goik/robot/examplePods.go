@@ -223,3 +223,27 @@ func NewExampleHexapodSTS3215() *BodyDefinition {
 
 	return b
 }
+
+// Example insect like hexapod with twisted joints (see twist.go): a long, narrow body carried low, short coxas,
+// and knees high above the body. The front legs are swept forward and twisted so the feet reach forward, the
+// rear legs mirror that backwards, and the middle legs point straight out. A showcase for twisted joints: the
+// coxas are too short for real servos, and the CAD export doesn't support twisted joints yet.
+func NewExampleInsect() *BodyDefinition {
+	d, err := NewRectangularDesign(3, 150, 50, SegmentLengths{Coxa: 25, Femur: 70, Tibia: 110}, ServoAngles{})
+	if err != nil {
+		panic(err)
+	}
+	front, rear := &d.Mounts[0], &d.Mounts[2]
+	front.Rest.Coxa, rear.Rest.Coxa = 35, -35
+	front.Twists = JointTwists{Coxa: -15, Femur: -25, Tibia: 15}
+	rear.Twists = JointTwists{Coxa: 15, Femur: 25, Tibia: -15}
+
+	b, err := d.BodyDefinition(nil)
+	if err != nil {
+		panic(err)
+	}
+	if err := applyStance(b, &Stance{Height: 55, Reach: 95}); err != nil {
+		panic(err)
+	}
+	return b
+}

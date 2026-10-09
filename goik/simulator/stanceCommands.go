@@ -146,6 +146,11 @@ func (s *Shell) showStance() error {
 
 	s.outputCh <- fmt.Sprintf("The feet can step %.0f mm around the neutral stance (with the default step height of %.0f mm)",
 		rest.ReachRadius(robot.Z_LIFT), robot.Z_LIFT)
+	var feet []robot.Coordinate
+	for _, leg := range rest.Legs {
+		feet = append(feet, leg.NeutralEffectorCoordinate)
+	}
+	s.outputCh <- fmt.Sprintf("Stability margin: the centre of the body is %.0f mm inside the feet's support polygon", robot.SupportMargin(feet))
 	if lowest, highest, ok := robot.StanceHeightRange(b); ok {
 		s.outputCh <- fmt.Sprintf("Possible heights with these reach settings: %.0f to %.0f mm", lowest, highest)
 	}

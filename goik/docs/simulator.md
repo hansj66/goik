@@ -41,6 +41,7 @@ which is scaled to fill the window. A wider window shows more of the ground arou
 | 5 | Eight legged "spider" with different leg lengths |
 | 6 | Hexapod designed around real AX-12A servos |
 | 7 | Hexapod designed around real STS3215 servos |
+| 8 | Insect like hexapod with twisted joints (see [Twisted joints](designing-a-pod.md#twisted-joints)) |
 
 Use pod 6 or 7 for the [CAD export](cad-export.md): the older pods are too small for real servos.
 
@@ -54,7 +55,7 @@ A step by step guide with examples: [designing-a-pod.md](designing-a-pod.md).
 
 | Command | Does |
 |---|---|
-| `reset <0-7>` | Load an example pod |
+| `reset <0-8>` | Load an example pod |
 | `save <file>` / `load <file>` | Save / load the pod definition |
 | `set_coxa_length <ALL \| leg> <mm>` | Coxa length |
 | `set_femur_length <ALL \| leg> <mm>` | Femur length |
@@ -62,6 +63,7 @@ A step by step guide with examples: [designing-a-pod.md](designing-a-pod.md).
 | `set_coxa_angle <ALL \| leg> <degrees>` | Coxa rest angle |
 | `set_femur_angle <ALL \| leg> <degrees>` | Femur rest angle |
 | `set_tibia_angle <ALL \| leg> <degrees>` | Tibia rest angle |
+| `set_coxa_twist <ALL \| leg> <degrees>` | Turn the coxa axis about the mount direction. Also `set_femur_twist` (the femur axis about the coxa) and `set_tibia_twist` (the tibia axis about the femur). See [Twisted joints](designing-a-pod.md#twisted-joints) |
 | `stance <height> [reach \| vertical]` | Set how high the body stands above the ground. The femur and tibia rest angles are computed from it. See [Stance](designing-a-pod.md#stance-how-high-the-pod-stands) |
 | `stance reach <leg> <reach \| default>` | Reach (foot distance from the femur joint) for one leg |
 | `stance` / `stance off` | Show the stance, with the possible heights / set the femur and tibia rest angles by hand again |

@@ -80,6 +80,7 @@ type runStats struct {
 	minGroundedLegs  int
 	ticksToSettle    int
 	maxNeutralOffset float64
+	ikErrors         int
 }
 
 // runScenario chains a list of motions on a fresh pod and measures the motion quality
@@ -148,6 +149,7 @@ func runScenario(t *testing.T, body *BodyDefinition, steps []step) runStats {
 	if e.IKErrors > 0 {
 		t.Errorf("%d IK errors, last: %v", e.IKErrors, e.LastError)
 	}
+	stats.ikErrors = e.IKErrors
 	return stats
 }
 

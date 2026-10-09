@@ -27,7 +27,7 @@ type helpSection struct {
 
 var helpSections = []helpSection{
 	{"design", "Pod design", []string{
-		"reset <0-7>                                - Load example pod <n> (6: AX-12A servos, 7: STS3215 servos)",
+		"reset <0-8>                                - Load example pod <n> (6: AX-12A servos, 7: STS3215 servos, 8: insect)",
 		"save <filename> / load <filename>          - Save / load the pod definition (including servo mapping)",
 		"set_coxa_length <ALL | legNum> <mm>        - Segment lengths (with a design, a leg's mirror image changes with it)",
 		"set_femur_length <ALL | legNum> <mm>",
@@ -35,6 +35,9 @@ var helpSections = []helpSection{
 		"set_coxa_angle <ALL | legNum> <angle>      - Rest angles (degrees)",
 		"set_femur_angle <ALL | legNum> <angle>       (femur and tibia: only without a stance)",
 		"set_tibia_angle <ALL | legNum> <angle>",
+		"set_coxa_twist <ALL | legNum> <angle>      - Turn the coxa axis about the mount direction (-45 to 45)",
+		"set_femur_twist <ALL | legNum> <angle>     - Turn the femur axis about the coxa",
+		"set_tibia_twist <ALL | legNum> <angle>     - Turn the tibia axis about the femur. 0: the standard leg",
 		"stance <height> [reach | vertical]         - Body height above the ground (mm). The femur and tibia rest",
 		"                                             angles follow. Reach: foot distance from the femur joint (default:",
 		"                                             tibia vertical). 'stance' shows it, with the possible heights",
@@ -49,6 +52,8 @@ var helpSections = []helpSection{
 		"design move <leg> <x> <y> [angle]          - Move a leg (and its mirror image). Also design angle <leg> <angle>",
 		"design remove <leg>                        - Remove a leg and its mirror image",
 		"design outline <auto | x y x y ...>        - Body outline, +X half from X = 0 to X = 0 (auto: through the legs)",
+		"design scale <factor>                      - Make the body larger (> 1) or smaller: moves the legs out or in",
+		"design radius <mm>                         - Scale the body so the furthest leg mount is <mm> from the centre",
 		"design off                                 - Drop the design, so legs can be changed one at a time",
 	}},
 	{"walk", "Walking", []string{

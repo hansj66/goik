@@ -17,8 +17,6 @@ package robot
 import (
 	"fmt"
 	"math"
-
-	"gonum.org/v1/gonum/mat"
 )
 
 // Z_LIFT is the default maximum height (in mm) of the arc described by the end effector in the swing phase
@@ -44,24 +42,28 @@ func (p *Pod) SetDebugChannel(channel chan string) {
 	p.debugChannel = channel
 }
 
-// setLeg changes the segment lengths and rest angles of a leg. When the pod has a design, the change is made
-// to the design, so the leg's mirror image changes with it, and the pod is rebuilt from the design. When the
-// pod has a stance, the stance sets the femur and tibia rest angles. The pod is unchanged if the change fails.
-func (p *Pod) setLeg(legNum int, change func(segments *SegmentLengths, rest *ServoAngles)) error {
+// setLeg changes the segment lengths, rest angles and joint twists of a leg. When the pod has a design, the
+// change is made to the design, so the leg's mirror image changes with it, and the pod is rebuilt from the
+// design. When the pod has a stance, the stance sets the femur and tibia rest angles. The pod is unchanged if
+// the change fails.
+func (p *Pod) setLeg(legNum int, change func(segments *SegmentLengths, rest *ServoAngles, twists *JointTwists)) error {
 	b := p.BodyDefinition
 	if legNum < 0 || legNum >= b.NumLegs {
 		return fmt.Errorf("Unable to modify leg %d. The current body definition only has %d legs", legNum, b.NumLegs)
 	}
 
-	segments, rest := b.Segments[legNum], b.RestAngles[legNum]
-	change(&segments, &rest)
+	segments, rest, twists := b.Segments[legNum], b.RestAngles[legNum], b.LegTwists(legNum)
+	change(&segments, &rest, &twists)
+	if err := twists.Validate(); err != nil {
+		return err
+	}
 	if b.Stance != nil && (rest.Femur != b.RestAngles[legNum].Femur || rest.Tibia != b.RestAngles[legNum].Tibia) {
 		return fmt.Errorf("the pod's stance sets the femur and tibia rest angles. Change the stance ('stance <height> [reach]') or remove it ('stance off')")
 	}
 
 	if b.Design != nil {
 		d := b.Design.Clone()
-		if err := d.SetLeg(legNum, segments, rest); err != nil {
+		if err := d.SetLeg(legNum, segments, rest, twists); err != nil {
 			return err
 		}
 		return p.ApplyDesign(d)
@@ -70,7 +72,14 @@ func (p *Pod) setLeg(legNum int, change func(segments *SegmentLengths, rest *Ser
 	changed := *b
 	changed.Segments = append([]SegmentLengths(nil), b.Segments...)
 	changed.RestAngles = append([]ServoAngles(nil), b.RestAngles...)
-	changed.Segments[legNum], changed.RestAngles[legNum] = segments, rest
+	changed.Twists = make([]JointTwists, b.NumLegs)
+	for l := range changed.Twists {
+		changed.Twists[l] = b.LegTwists(l)
+	}
+	changed.Segments[legNum], changed.RestAngles[legNum], changed.Twists[legNum] = segments, rest, twists
+	if !changed.HasTwists() {
+		changed.Twists = nil
+	}
 	if changed.Stance != nil {
 		if err := applyStance(&changed, changed.Stance); err != nil {
 			return fmt.Errorf("not possible with the pod's stance (change the stance, or remove it with 'stance off'): %w", err)
@@ -82,32 +91,47 @@ func (p *Pod) setLeg(legNum int, change func(segments *SegmentLengths, rest *Ser
 
 // SetCoxaLength redefines the length of the coxa leg segment
 func (p *Pod) SetCoxaLength(legNum int, length float64) error {
-	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles) { s.Coxa = length })
+	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles, _ *JointTwists) { s.Coxa = length })
 }
 
 // SetFemurLength redefines the length of the femur leg segment
 func (p *Pod) SetFemurLength(legNum int, length float64) error {
-	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles) { s.Femur = length })
+	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles, _ *JointTwists) { s.Femur = length })
 }
 
 // SetTibiaLength redefines the length of the tibia segment
 func (p *Pod) SetTibiaLength(legNum int, length float64) error {
-	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles) { s.Tibia = length })
+	return p.setLeg(legNum, func(s *SegmentLengths, _ *ServoAngles, _ *JointTwists) { s.Tibia = length })
 }
 
 // SetCoxaAngle redefines the rest angle of the coxa joint
 func (p *Pod) SetCoxaAngle(legNum int, angle float64) error {
-	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles) { a.Coxa = angle })
+	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles, _ *JointTwists) { a.Coxa = angle })
 }
 
 // SetFemurAngle redefines the rest angle of the femur joint
 func (p *Pod) SetFemurAngle(legNum int, angle float64) error {
-	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles) { a.Femur = angle })
+	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles, _ *JointTwists) { a.Femur = angle })
 }
 
 // SetTibiaAngle redefines the rest angle of the tibia joint
 func (p *Pod) SetTibiaAngle(legNum int, angle float64) error {
-	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles) { a.Tibia = angle })
+	return p.setLeg(legNum, func(_ *SegmentLengths, a *ServoAngles, _ *JointTwists) { a.Tibia = angle })
+}
+
+// SetCoxaTwist sets the twist (degrees) of the coxa axis about the mount direction (see twist.go)
+func (p *Pod) SetCoxaTwist(legNum int, twist float64) error {
+	return p.setLeg(legNum, func(_ *SegmentLengths, _ *ServoAngles, t *JointTwists) { t.Coxa = twist })
+}
+
+// SetFemurTwist sets the twist (degrees) of the femur axis about the coxa (see twist.go)
+func (p *Pod) SetFemurTwist(legNum int, twist float64) error {
+	return p.setLeg(legNum, func(_ *SegmentLengths, _ *ServoAngles, t *JointTwists) { t.Femur = twist })
+}
+
+// SetTibiaTwist sets the twist (degrees) of the tibia axis about the femur (see twist.go)
+func (p *Pod) SetTibiaTwist(legNum int, twist float64) error {
+	return p.setLeg(legNum, func(_ *SegmentLengths, _ *ServoAngles, t *JointTwists) { t.Tibia = twist })
 }
 
 // ApplyDesign rebuilds the pod from a design, keeping the gait type and the servo mapping when they fit the
@@ -137,20 +161,16 @@ func (p *Pod) ApplyDesign(d *PodDesign) error {
 func (p *Pod) UpdatePodStructure() {
 	// The robot body is flat in the XY plane in the base reference frame.
 	for l := 0; l < p.BodyDefinition.NumLegs; l++ {
-		// Pod body is described as an inscribed polygon with a radius r (== distance from center of robot)
-		// Leg offset Transformation matrix
-		OffsetTransformationMatrix := mat.NewDense(4, 4, []float64{
-			math.Cos(p.BodyDefinition.CoxaAngles[l] * math.Pi / 180), -math.Sin(p.BodyDefinition.CoxaAngles[l] * math.Pi / 180), 0, p.BodyDefinition.CoxaCoordinates[l].X,
-			math.Sin(p.BodyDefinition.CoxaAngles[l] * math.Pi / 180), math.Cos(p.BodyDefinition.CoxaAngles[l] * math.Pi / 180), 0, p.BodyDefinition.CoxaCoordinates[l].Y,
-			0, 0, 1, p.BodyDefinition.CoxaCoordinates[l].Z,
-			0, 0, 0, 1,
-		})
+		// Leg offset transformation matrix: where the coxa joint is, and which way the leg points
+		twists := p.BodyDefinition.LegTwists(l)
+		OffsetTransformationMatrix := MountMatrix(p.BodyDefinition.CoxaCoordinates[l], p.BodyDefinition.CoxaAngles[l], twists.Coxa)
 
 		p.Legs[l] = NewLeg(l,
 			p.BodyDefinition.CoxaAngles[l],
 			OffsetTransformationMatrix,
 			p.BodyDefinition.RestAngles[l],
 			p.BodyDefinition.Segments[l],
+			twists,
 			p.debugChannel)
 	}
 	p.Engine = nil

@@ -16,6 +16,7 @@ package simulator
 
 import (
 	"GOIK/robot"
+	"math"
 	"strings"
 	"testing"
 )
@@ -119,5 +120,39 @@ func TestDesignImportOfAnAsymmetricPod(t *testing.T) {
 	}
 	if out, _ := s.run("design"); !strings.Contains(out, "no design") {
 		t.Errorf("unexpected output:\n%s", out)
+	}
+}
+
+func TestDesignScale(t *testing.T) {
+	s := newTestShell(t, robot.NewExampleHexapodSTS3215())
+	s.mustRun("design import")
+	s.mustRun("set_femur_twist 1 -20")
+	s.mustRun("stance 100")
+	s.mustRun("design scale 1.25")
+	b := s.Pod.BodyDefinition
+	if c := b.CoxaCoordinates[0]; c.X != 82.5 || c.Y != 0 {
+		t.Errorf("leg 0 at %v, want (82.5, 0)", c)
+	}
+	if c := b.CoxaCoordinates[1]; c.X != 41.25 || c.Y != 71.45 {
+		t.Errorf("leg 1 at %v, want (41.25, 71.45)", c)
+	}
+	// The legs, their twists and the stance stay
+	if b.Segments[1].Coxa != 52 || b.LegTwists(1).Femur != -20 || b.LegTwists(2).Femur != 20 || b.Stance == nil || b.Stance.Height != 100 {
+		t.Errorf("segments %+v, twists %v, stance %+v", b.Segments[1], b.Twists, b.Stance)
+	}
+	if _, err := s.run("design scale 0"); err == nil {
+		t.Errorf("a scale of 0 was accepted")
+	}
+
+	// The radius: pod 7's legs are mounted 66 mm from the centre, 82.5 after the scale
+	if out := s.mustRun("design"); !strings.Contains(out, "Body radius: 82.50 mm") {
+		t.Errorf("radius not shown:\n%s", out)
+	}
+	s.mustRun("design radius 90")
+	if c := s.Pod.BodyDefinition.CoxaCoordinates[0]; c.X != 90 || c.Y != 0 {
+		t.Errorf("leg 0 at %v, want (90, 0)", c)
+	}
+	if c := s.Pod.BodyDefinition.CoxaCoordinates[1]; math.Abs(math.Hypot(c.X, c.Y)-90) > 0.01 {
+		t.Errorf("leg 1 at %v, want 90 mm from the centre", c)
 	}
 }

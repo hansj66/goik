@@ -18,11 +18,15 @@
     1. Test print: screw access, print orientation and supports per part, part strength (tibia beam 12 x 10 mm)
     1. Per part print orientation in the STL export (currently each part lies in its own frame on Z = 0)
     1. Open question: printer, material and bed size (FDM with PLA or PETG?). The body plates of pod 6 are about 230 mm across
+1. CAD export of [twisted joints](docs/designing-a-pod.md#twisted-joints): femur and tibia twists are exported (see [docs/cad-export.md](docs/cad-export.md#twisted-joints)), coxa twists not yet
+    1. Validate twisted femur and tibia brackets in Fusion 360, and with a test print: the tilted side plates of the coxa bracket and the wedge pads of the femur bracket
+    1. Coxa twists: the coxa servos sit tilted, so the flat body plates need an angled mounting block per servo
+    1. Check twisted brackets over the joint ranges, not only in the rest pose: a twisted femur or tibia swings in a tilted plane, closer to the bracket arms of the joint before it (part of the "Validate a design" item below)
 1. Validate a design against the servos it will use, while designing it (not only when exporting to CAD)
     1. Today: the CAD export checks the rest pose for collisions and stops if the coxa is too short for the servos. Nothing warns while a pod is being designed or walked in the simulator
     1. A `validate` command in the shell (and later live warnings in the views) for the selected servo model. Needs the servo dimensions in Go (case, horn axis position, mounting faces), shared with `cad/servos.json` so there is one source of truth
     1. Fit: the coxa servos fit around the body without overlapping, the coxa is long enough for the femur servo to clear the coxa servo at every coxa angle, the femur is long enough for the tibia servo (the checks behind example pods 6 and 7, made general)
-    1. Collisions over the joint ranges: sweep each joint through its range (or the servo mapping's soft limits), and check servos and brackets against each other, the body and the ground
+    1. Collisions over the joint ranges: sweep each joint through its range (or the servo mapping's soft limits), and check servos and brackets against each other, the body and the ground. The CAD export already turns neighbouring legs' coxas towards each other; the femur and tibia ranges, and the ground, are still to do
     1. Collisions between neighbouring legs while walking: run the gait engine through the gaits and speeds and check legs against each other
     1. Joint angles: every angle the gait engine and the body pose use stays within the servo's range and the soft limits (AX-12A and XL-320: 300 degrees, STS3215: 360)
     1. Load: static torque per joint with the pod's weight (servos, brackets, electronics) on the fewest legs a gait stands on, compared with the servo's stall torque, with a safety margin

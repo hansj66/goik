@@ -56,6 +56,10 @@ type Leg struct {
 	// Most hexapods have identical leg topologies, but it
 	// never hurts to prepare for other form factors :)
 	SegmentLengths SegmentLengths
+	// Twists of the joints' rotation axes (see twist.go). All 0 is the standard leg
+	Twists JointTwists
+	// The kinematic chain for the numeric inverse kinematics of twisted legs
+	model legModel
 	// The Joints array contain the location of the reference
 	// frame origin for each joint in the base reference frame
 	// coordinate system.
@@ -103,8 +107,9 @@ func (l *Leg) RecalculateForwardKinematics(angles ServoAngles) {
 // transforms returns the homogeneous transformation matrices from the base reference frame to
 // the femur origin (H0_1), the tibia origin (H1_2) and the end effector (H2_3)
 func (l *Leg) transforms(angles ServoAngles) (*mat.Dense, *mat.Dense, *mat.Dense) {
-	P_Femur := mat.NewDense(3, 3, []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}) // Identity
-	P_Coxa := mat.NewDense(3, 3, []float64{1, 0, 0, 0, 0, -1, 0, 1, 0})
+	// The femur axis is turned 90 degrees (plus its twist) about the coxa, the tibia axis by its twist about the femur
+	P_Coxa := rotXDense(90 + l.Twists.Femur)
+	P_Femur := rotXDense(l.Twists.Tibia)
 	P_Tibia := mat.NewDense(3, 3, []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}) // Identity
 
 	H_Coxa := HomogeneousTransformationMatrix(P_Coxa, angles.Coxa*math.Pi/180.0, l.SegmentLengths.Coxa)
@@ -144,20 +149,44 @@ func NewLeg(
 	ServoAngles ServoAngles,
 	// The distance between reference frames (coxa == distance from coxa reference frame origin to femur reference frame origin)
 	SegmentLengths SegmentLengths,
+	// Twists of the joint axes (all 0: the standard leg). The coxa twist must be part of OffsetTransformationMatrix (see MountMatrix)
+	Twists JointTwists,
 	// output channel for debug messages
 	debugChannel chan string) *Leg {
 	l := Leg{
 		OffsetTransformationMatrix: OffsetTransformationMatrix,
 		SegmentLengths:             SegmentLengths,
+		Twists:                     Twists,
 		Index:                      Index,
 		ServoAngles:                ServoAngles,
 		CoxaSeparationAngle:        CoxaSeparationAngle,
 		debugChannel:               debugChannel,
 	}
 
+	origin := l.GetJointOrigin(OffsetTransformationMatrix)
+	l.model = newLegModel(origin, CoxaSeparationAngle, SegmentLengths, Twists)
+
 	l.RecalculateForwardKinematics(ServoAngles)
 
 	l.NeutralEffectorCoordinate = l.Joints[EFFECTOR_ORIGIN_INDEX]
 
 	return &l
+}
+
+// rotXDense returns a rotation about X (degrees) as a matrix
+func rotXDense(degrees float64) *mat.Dense {
+	r := rotX(degrees)
+	return mat.NewDense(3, 3, []float64{r[0][0], r[0][1], r[0][2], r[1][0], r[1][1], r[1][2], r[2][0], r[2][1], r[2][2]})
+}
+
+// MountMatrix returns the transformation from the body to a leg's coxa frame: the coxa joint at position, the
+// leg pointing at the mount angle (degrees) and the coxa axis turned by the coxa twist (degrees)
+func MountMatrix(position Coordinate, mountAngle float64, coxaTwist float64) *mat.Dense {
+	r := rotZ(mountAngle * math.Pi / 180).mul(rotX(coxaTwist))
+	return mat.NewDense(4, 4, []float64{
+		r[0][0], r[0][1], r[0][2], position.X,
+		r[1][0], r[1][1], r[1][2], position.Y,
+		r[2][0], r[2][1], r[2][2], position.Z,
+		0, 0, 0, 1,
+	})
 }

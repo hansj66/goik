@@ -92,6 +92,13 @@ type CadAssembly struct {
 
 // NewCadAssembly describes the pod in its rest pose
 func NewCadAssembly(b *BodyDefinition, name string) (*CadAssembly, error) {
+	// The printable brackets (cad/brackets.py) follow femur and tibia twists. A coxa twist would tilt the coxa
+	// servos on the body plates
+	for l := 0; l < b.NumLegs; l++ {
+		if b.LegTwists(l).Coxa != 0 {
+			return nil, fmt.Errorf("the CAD export doesn't support coxa twists yet (leg %d): the body plates are built for upright coxa servos", l)
+		}
+	}
 	mapping := b.ServoMapping()
 	if err := mapping.Validate(b.NumLegs); err != nil {
 		return nil, err

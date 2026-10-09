@@ -23,6 +23,13 @@ A link from joint j to joint j+1 is built in the link frame Lk = joint frame j r
 angle: origin on joint j, Z along joint j's axis and X towards joint j+1. The horn (and the idler on
 the other side of the servo) turns with this frame, so that is where a bracket attached to them lives.
 
+Joints can be twisted (see robot/twist.go): the femur axis turned about the coxa link, the tibia axis about the
+femur link. The arms still turn in the link frame, but the next servo is turned about the link (X). The parts screwed
+to the next servo's case (the coxa bracket's side plates, the femur bracket's pads) are built in the twisted frame
+Lt = Lk Rx(twist), where that servo sits as it does without a twist, then tilted into place and trimmed to the arms.
+The pads become wedges between an arm and the tilted case face. A twist is only possible as long as the next servo
+stays clear of the arms (check_fit).
+
 Mounting features can differ per model: the case holes may differ between the horn side and the
 idler side (the STS3215), the idler may be a hub with one centre screw (AX-12A) or a disc with a
 screw pattern like the horn (STS3215), and the arms can stand off the horn and idler, so that plates
@@ -79,6 +86,13 @@ def rz(angle_degrees):
     a = math.radians(angle_degrees)
     m = np.eye(4)
     m[0, 0], m[0, 1], m[1, 0], m[1, 1] = math.cos(a), -math.sin(a), math.sin(a), math.cos(a)
+    return m
+
+
+def rx(angle_degrees):
+    a = math.radians(angle_degrees)
+    m = np.eye(4)
+    m[1, 1], m[1, 2], m[2, 1], m[2, 2] = math.cos(a), -math.sin(a), math.sin(a), math.cos(a)
     return m
 
 
@@ -140,16 +154,105 @@ def horn_side(joint, lk):
     return 1.0 if (np.linalg.inv(lk) @ to_np(joint["servo"]))[2, 2] > 0 else -1.0
 
 
-def arms(servo, side, x_end, half_width, horn_holes, idler_holes):
+def arm_inner_faces(servo, side):
+    """z (link frame) of the inner faces of the arms on the horn and on the idler of the servo at the link frame
+    origin. The next servo sits between them"""
+    horn_inner = side * servo.horn_face + side * servo.horn_standoff
+    idler_inner = side * servo.idler_face - side * FIT - side * servo.idler_standoff
+    return horn_inner, idler_inner
+
+
+def joint_twist(servo, next_joint, lk, untwisted, name):
+    """The twist (degrees) of the next joint's axis about the link frame's X axis. untwisted is the axis's direction
+    without a twist: "y" (the femur axis in the coxa link frame) or "z" (the tibia axis in the femur link frame)"""
+    _, axis = case_holes_in_link_frame(servo, next_joint, lk)
+    if abs(axis[0]) > 1e-6:
+        raise ValueError(f"the {name} axis must be square to the link before it")
+    if untwisted == "y":
+        a = math.degrees(math.atan2(axis[2], axis[1]))
+    else:
+        a = math.degrees(math.atan2(-axis[1], axis[2]))
+    # The axis points either way (inverted servos)
+    while a > 90:
+        a -= 180
+    while a <= -90:
+        a += 180
+    return 0.0 if abs(a) < 1e-9 else a
+
+
+def y_span(part, z_a, z_b):
+    """(lowest, highest) y of the part between the heights z_a and z_b"""
+    slab = cq.Workplane("XY").box(2000, 2000, abs(z_b - z_a), centered=False).translate((-1000, -1000, min(z_a, z_b)))
+    box = part.intersect(slab).val().BoundingBox()
+    return box.ymin, box.ymax
+
+
+def servo_points(servo):
+    """Points on the surface of a servo's case, horn and idler hub (centred coordinates), for check_fit"""
+    lo, hi = servo.case_faces
+    xs = np.linspace(servo.case_x[0], servo.case_x[1], 26)
+    ys = np.linspace(-servo.case_y, servo.case_y, 9)
+    zs = np.linspace(lo, hi, 9)
+    points = [(x, y, z) for x in xs for y in (-servo.case_y, servo.case_y) for z in zs]
+    points += [(x, y, z) for x in xs for y in ys for z in (lo, hi)]
+    points += [(x, y, z) for x in servo.case_x for y in ys for z in zs]
+    for a in np.linspace(0, 2 * math.pi, 72, endpoint=False):
+        for z in (hi, servo.horn_face):
+            points.append((servo.horn_radius * math.cos(a), servo.horn_radius * math.sin(a), z))
+        for z in (lo, servo.idler_face):
+            points.append((servo.idler_boss * math.cos(a), servo.idler_boss * math.sin(a), z))
+    return np.array(points)
+
+
+def check_fit(servo, joint, next_joint, lk, twist, x_end, name, bracket):
+    """The next servo (turned by its twist) must stay CLEARANCE inside the arms of the bracket on the servo at the
+    link frame origin, where the arms are (up to x_end)"""
+    inner = sorted(arm_inner_faces(servo, horn_side(joint, lk)))
+    tilt = rx(twist)
+    # The next servo in the twisted frame, where it sits as without a twist
+    untwisted = np.linalg.inv(lk @ tilt) @ to_np(next_joint["servo"])
+    points = np.array([apply(untwisted, p) for p in servo_points(servo)])
+
+    def fits(angle):
+        r = rx(angle)[:3, :3]
+        turned = points @ r.T
+        near = turned[turned[:, 0] <= x_end + CLEARANCE]
+        return len(near) == 0 or (near[:, 2].min() >= inner[0] + CLEARANCE and near[:, 2].max() <= inner[1] - CLEARANCE)
+
+    if fits(twist):
+        return
+    largest, step = 0.0, 0.5 if twist > 0 else -0.5
+    while abs(largest + step) <= abs(twist) and fits(largest + step):
+        largest += step
+    raise ValueError(f"the {name} twist of {twist:.1f} degrees turns the {name} servo into the arms of the {bracket} bracket. "
+                     f"With this servo, at most {abs(largest):.1f} degrees fit")
+
+
+def arms(servo, side, x_end, width, horn_holes, idler_holes, taper=None):
     """Arms on the horn and the idler of the servo at the link frame origin, reaching x_end.
 
+    width is the arms' half width, or ((y0, y1) of the horn arm, (y0, y1) of the idler arm) for arms that are
+    as wide as what they hold (twisted joints). taper = (x_start, half width at the servo) makes such arms only
+    that wide at the servo, widening to their full width at x_start: neighbouring legs are closest near the body.
     The arms stand off the horn and idler on bosses (if the model asks for it), and the idler arm
     stands off the idler by FIT, so the servo slides in between the arms.
     Returns ((horn arm, idler arm), (z of the horn arm's inner face, z of the idler arm's inner face))
     """
-    def outline(z0, thickness):
+    if isinstance(width, tuple):
+        horn_span, idler_span = width
+    else:
+        horn_span = idler_span = (-width, width)
+
+    def outline(z0, thickness, ys):
         disc = cq.Workplane("XY").workplane(offset=z0).circle(ARM_RADIUS).extrude(thickness)
-        bar = cq.Workplane("XY").workplane(offset=z0).center(x_end / 2, 0).rect(x_end, 2 * half_width).extrude(thickness)
+        if taper is None:
+            bar = cq.Workplane("XY").workplane(offset=z0).center(x_end / 2, (ys[0] + ys[1]) / 2) \
+                .rect(x_end, ys[1] - ys[0]).extrude(thickness)
+        else:
+            x_start, base = taper
+            bar = cq.Workplane("XY").workplane(offset=z0).polyline(
+                [(0, -base), (x_start, ys[0]), (x_end, ys[0]), (x_end, ys[1]), (x_start, ys[1]), (0, base)]) \
+                .close().extrude(thickness)
         return disc.union(bar)
 
     def span(a, b):
@@ -157,9 +260,9 @@ def arms(servo, side, x_end, half_width, horn_holes, idler_holes):
         return min(a, b), abs(b - a)
 
     horn_face = side * servo.horn_face
-    horn_inner = horn_face + side * servo.horn_standoff
+    horn_inner, idler_inner = arm_inner_faces(servo, side)
     z0, t = span(horn_inner, horn_inner + side * ARM)
-    horn_arm = outline(z0, t)
+    horn_arm = outline(z0, t, horn_span)
     if servo.horn_standoff > 0:
         s0, st = span(horn_face, horn_inner)
         horn_arm = horn_arm.union(cq.Workplane("XY").workplane(offset=s0).circle(servo.horn_radius + 1).extrude(st))
@@ -169,9 +272,8 @@ def arms(servo, side, x_end, half_width, horn_holes, idler_holes):
     horn_arm = horn_arm.cut(cq.Workplane("XY").workplane(offset=lo - 1).circle(servo.horn_centre / 2).extrude(length + 2))
 
     idler_face = side * servo.idler_face - side * FIT
-    idler_inner = idler_face - side * servo.idler_standoff
     z0, t = span(idler_inner, idler_inner - side * ARM)
-    idler_arm = outline(z0, t)
+    idler_arm = outline(z0, t, idler_span)
     if servo.idler_standoff > 0:
         s0, st = span(idler_face, idler_inner)
         idler_arm = idler_arm.union(cq.Workplane("XY").workplane(offset=s0).circle(servo.idler_boss + 1).extrude(st))
@@ -201,63 +303,90 @@ def case_holes_in_link_frame(servo, next_joint, lk):
 
 
 def coxa_bracket(servo, joint, next_joint):
-    """Arms on the coxa horn and idler, and side plates screwed to the femur servo's case faces"""
+    """Arms on the coxa horn and idler, and side plates screwed to the femur servo's case faces.
+
+    The side plates are built in the twisted frame (where the femur servo sits as without a femur twist), tilted into
+    place and trimmed to the arms. The arms are as wide as the tilted plates"""
     lk = link_frame(joint)
     side = horn_side(joint, lk)
-    faces, axis = case_holes_in_link_frame(servo, next_joint, lk)
-    if abs(axis[1]) < 0.99:
-        raise ValueError("coxa bracket: the femur axis must be horizontal and perpendicular to the coxa link")
+    twist = joint_twist(servo, next_joint, lk, "y", "femur")
+    tilt = rx(twist)
+    faces, _ = case_holes_in_link_frame(servo, next_joint, lk @ tilt)
 
     points = [p for face in faces for p in face]
     x0 = min(p[0] for p in points) - PAD_MARGIN
     x1 = max(p[0] for p in points) + PAD_MARGIN
-    half_width = max(abs(p[1]) for p in points) + SIDE_PLATE
+    check_fit(servo, joint, next_joint, lk, twist, x1, "femur", "coxa")
 
-    (horn_arm, idler_arm), (horn_inner, idler_inner) = arms(servo, side, x1, half_width + FIT,
-                                                             *screw_holes_in_link_frame(servo, joint, lk))
-    part = horn_arm.union(idler_arm)
+    horn_inner, idler_inner = arm_inner_faces(servo, side)
     z_lo = min(horn_inner, idler_inner) - ARM
     z_hi = max(horn_inner, idler_inner) + ARM
+    between_arms = cq.Workplane("XY").box(x1 - x0, 400, z_hi - z_lo, centered=False).translate((x0, -200, z_lo))
 
+    plates = None
     for face in faces:
         s = 1.0 if face[0][1] > 0 else -1.0
         y_face = face[0][1] + s * FIT
         y0 = min(y_face, y_face + s * SIDE_PLATE)
-        plate = cq.Workplane("XY").box(x1 - x0, SIDE_PLATE, z_hi - z_lo, centered=False).translate((x0, y0, z_lo))
+        plate = cq.Workplane("XY").box(x1 - x0, SIDE_PLATE, 400, centered=False).translate((x0, y0, -200))
         for p in face:
             plate = plate.cut(cq.Workplane("XZ").workplane(offset=-(y0 - 1)).center(p[0], p[2])
                               .circle(servo.screw / 2).extrude(-(SIDE_PLATE + 2)))
-        part = part.union(plate)
-    return part, lk
+        plate = place(plate, tilt).intersect(between_arms)
+        plates = plate if plates is None else plates.union(plate)
+
+    # Each arm as wide as the plates where they meet it (tilted plates meet the two arms at different places)
+    spans = tuple(y_span(plates, z, z + d * ARM) for z, d in ((horn_inner, side), (idler_inner, -side)))
+    untwisted = max(abs(face[0][1]) for face in faces) + FIT + SIDE_PLATE
+    (horn_arm, idler_arm), _ = arms(servo, side, x1, spans, *screw_holes_in_link_frame(servo, joint, lk),
+                                    taper=(x0, untwisted))
+    return horn_arm.union(idler_arm).union(plates), lk
 
 
 def femur_bracket(servo, joint, next_joint):
-    """Arms on the femur horn and idler, with pads screwed to the tibia servo's case faces"""
+    """Arms on the femur horn and idler, with pads screwed to the tibia servo's case faces.
+
+    The pads are built in the twisted frame (where the tibia servo sits as without a tibia twist), from the case face
+    outwards, tilted into place and trimmed at the arm: with a tibia twist they are wedges"""
     lk = link_frame(joint)
     side = horn_side(joint, lk)
-    faces, axis = case_holes_in_link_frame(servo, next_joint, lk)
-    if abs(axis[2]) < 0.99:
-        raise ValueError("femur bracket: the tibia axis must be parallel to the femur axis")
+    twist = joint_twist(servo, next_joint, lk, "z", "tibia")
+    tilt = rx(twist)
+    faces, _ = case_holes_in_link_frame(servo, next_joint, lk @ tilt)
 
     points = [p for face in faces for p in face]
     x0 = min(p[0] for p in points) - PAD_MARGIN
     x1 = max(p[0] for p in points) + PAD_MARGIN
-    half_width = max(abs(p[1]) for p in points) + PAD_MARGIN
+    pad_half_width = max(abs(p[1]) for p in points) + PAD_MARGIN
+    check_fit(servo, joint, next_joint, lk, twist, x1, "tibia", "femur")
 
-    (horn_arm, idler_arm), (horn_inner, idler_inner) = arms(servo, side, x1, half_width,
-                                                             *screw_holes_in_link_frame(servo, joint, lk))
-    halves = {"horn_side": horn_arm, "idler_side": idler_arm}
+    horn_inner, idler_inner = arm_inner_faces(servo, side)
+    pads = []
     for face in faces:
         z_face = face[0][2]
         horn = np.sign(z_face) == np.sign(horn_inner)
         arm_face = horn_inner if horn else idler_inner
-        lo, hi = min(z_face, arm_face), max(z_face, arm_face)
-        pad = cq.Workplane("XY").box(x1 - x0, 2 * half_width, hi - lo, centered=False).translate((x0, -half_width, lo))
-        key = "horn_side" if horn else "idler_side"
-        halves[key] = halves[key].union(pad)
+        # From the case face outwards (twisted frame), up to the arm (link frame)
+        s = 1.0 if z_face > 0 else -1.0
+        outwards = cq.Workplane("XY").box(x1 - x0, 2 * pad_half_width, 200, centered=False) \
+            .translate((x0, -pad_half_width, z_face if s > 0 else z_face - 200))
+        to_arm = cq.Workplane("XY").box(x1 - x0, 400, 200, centered=False) \
+            .translate((x0, -200, arm_face - 200 if s > 0 else arm_face))
+        pad = place(outwards, tilt).intersect(to_arm)
+        holes = None
         for p in face:
-            halves[key] = halves[key].cut(cq.Workplane("XY").workplane(offset=-60).center(p[0], p[1])
-                                          .circle(servo.screw / 2).extrude(120))
+            hole = cq.Workplane("XY").workplane(offset=-60).center(p[0], p[1]).circle(servo.screw / 2).extrude(120)
+            holes = hole if holes is None else holes.union(hole)
+        pads.append(("horn_side" if horn else "idler_side", pad, place(holes, tilt)))
+
+    # Each arm as wide as its pad where it meets the arm
+    face_of = {key: (horn_inner if key == "horn_side" else idler_inner) for key, _, _ in pads}
+    span_of = {key: y_span(pad, face_of[key] - 1, face_of[key] + 1) for key, pad, _ in pads}
+    (horn_arm, idler_arm), _ = arms(servo, side, x1, (span_of["horn_side"], span_of["idler_side"]),
+                                    *screw_holes_in_link_frame(servo, joint, lk), taper=(x0, pad_half_width))
+    halves = {"horn_side": horn_arm, "idler_side": idler_arm}
+    for key, pad, holes in pads:
+        halves[key] = halves[key].union(pad).cut(holes)
     return halves, lk
 
 
@@ -314,8 +443,10 @@ def body_plates(servo, assembly):
         for m, lk in zip(coxas, links):
             axis = apply(m, (0, 0, 0))
             # Everything around the front of the coxa axis (where the bracket turns, up to +/- 90
-            # degrees), beyond the nose radius
-            behind = SIDE_PLATE + servo.case_y + CLEARANCE
+            # degrees), beyond the nose radius. The cut starts behind the axis, but not so far behind that the nose
+            # comes loose from the plate (with a femur twist the nose radius can be small). Nothing of the
+            # bracket comes closer to the axis than the nose radius, so the neck that joins the nose stays clear
+            behind = min(SIDE_PLATE + servo.case_y + CLEARANCE, radius - 1)
             front = cq.Workplane("XY").workplane(offset=z0 - 1).center(100 - behind, 0).rect(200, 400).extrude(thickness + 2)
             nose = front.cut(cq.Workplane("XY").workplane(offset=z0 - 2).circle(radius).extrude(thickness + 4))
             plate = plate.cut(place(nose, plane_frame(lk, axis)))
@@ -333,13 +464,33 @@ def nose_radius(servo, assembly):
     """Body plates stay inside this radius around the front of a coxa axis: the coxa bracket's side
     plates (on the femur servo case) turn just outside it"""
     far_hole = max(-x for face in (0, 1) for x, _ in servo.mounting_holes(face))
-    radius = min(
-        math.hypot(math.dist(leg["points"][0], leg["points"][1]) - far_hole - PAD_MARGIN, servo.case_y)
-        for leg in assembly["legs"]) - 2 * CLEARANCE
+    # Height (link frame) of the body plates' outer faces
+    lo, hi = servo.case_faces
+    z_body = max(abs(lo - BODY_IDLER_SIDE), abs(hi + BODY_HORN_SIDE)) + 1
+    radius = math.inf
+    twisted = False
+    for leg in assembly["legs"]:
+        coxa, femur = leg["joints"][0], leg["joints"][1]
+        lk = link_frame(coxa)
+        # Nearest the coxa axis: the inner edge of a side plate. Tilted by a femur twist, the plates' inner edges
+        # come closer to the axis at the height of the body plates
+        twist = joint_twist(servo, femur, lk, "y", "femur")
+        twisted = twisted or twist != 0
+        faces, _ = case_holes_in_link_frame(servo, femur, lk @ rx(twist))
+        g = math.radians(twist)
+        inner = servo.case_y
+        for face in faces:
+            y = abs(face[0][1]) + FIT
+            for z in (-z_body, z_body):
+                inner = min(inner, abs(y - math.copysign(1, face[0][1]) * z * math.sin(g)) / math.cos(g))
+        radius = min(radius, math.hypot(math.dist(leg["points"][0], leg["points"][1]) - far_hole - PAD_MARGIN, inner))
+    radius -= 2 * CLEARANCE
     near_corner = math.hypot(servo.case_x[1], servo.case_y)
     if radius < near_corner:
+        hint = (". A femur twist tilts the coxa bracket's side plates towards the coxa axis: make the coxa longer or "
+                "the twist smaller") if twisted else ""
         raise ValueError(f"the coxa is too short: the femur servo's mounting reaches within {radius:.1f} mm of the "
-                         f"coxa axis, but the coxa servo case needs {near_corner:.1f} mm to turn")
+                         f"coxa axis, but the coxa servo case needs {near_corner:.1f} mm to turn{hint}")
     return radius
 
 
@@ -390,6 +541,10 @@ def build(assembly, servo_data):
             parts.append((f"{prefix}_femur_bracket_{half}", place(part, lk), lk))
         part, lk = tibia(servo, tib, leg["points"][3])
         parts.append((f"{prefix}_tibia", place(part, lk), lk))
+
+    for name, part, _ in parts:
+        if len(part.solids().vals()) != 1:
+            raise ValueError(f"{name} falls apart into {len(part.solids().vals())} pieces")
     return parts
 
 

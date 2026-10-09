@@ -10,6 +10,9 @@ any other CAD program) to check and refine the design, move its joints with the
 *Example pod 6 (`reset 6`) in Fusion 360: real AX-12A models, the body plates (blue) and the printable brackets
 (orange). The joints were added by the [GOIK_Joints](fusion-joints.md) script.*
 
+Pods with [twisted joints](designing-a-pod.md#twisted-joints) can be exported if only the femur and tibia joints are
+twisted. See [Twisted joints](#twisted-joints).
+
 ## Quick start
 
 ```sh
@@ -73,13 +76,95 @@ No heat-set inserts: screws go through clearance holes into the servo.
 
 ### Collision check
 
-After building, all parts and servos are checked for collisions in the rest pose (`--no-check` skips it). A pod that
+After building, all parts and servos are checked for collisions in the rest pose (`--no-check` skips it), and every
+printable part must be a single piece. A pod that
 can't work stops with a message: the older example pods are too small for real servos, and exporting `reset 1` stops
 with "the coxa is too short". Example pods 6 and 7 were designed around the AX-12A's and the STS3215's dimensions, and
 nothing collides.
 
-The check doesn't cover other joint angles yet: the coxa can turn freely, but folding a tibia far back against its
-femur will eventually hit the femur bracket.
+Then neighbouring legs are turned towards each other about their coxa axes, in 5 degree steps up to 45 degrees, to
+find how far they can turn before their parts collide:
+
+```
+No collisions in the rest pose
+Neighbouring legs: clear while their coxas turn 30 degrees towards each other. Legs 0 and 1 collide at 35 degrees (leg0_tibia and leg1_tibia).
+```
+
+The coxas typically turn 15 to 20 degrees either way while walking. With less room than 20 degrees, the message
+suggests a larger body: `design scale <factor>` or `design radius <mm>` moves all legs out from the centre (see
+[designing-a-pod.md](designing-a-pod.md#add-move-turn-and-remove-legs)).
+
+Other joint angles aren't checked yet: folding a tibia far back against its femur will eventually hit the femur
+bracket.
+
+## Twisted joints
+
+With [twisted joints](designing-a-pod.md#twisted-joints), the femur servo is turned about the coxa link and the tibia
+servo about the femur link. The servos are placed from the joint frames, so they follow the twists by themselves. The
+brackets follow them like this:
+
+* **Coxa bracket** (femur twist): the arms on the coxa horn and idler stay in the coxa's plane. The side plates are
+  built on the femur servo's case as without a twist, tilted with the servo, and trimmed to the arms. Tilted, the
+  plates meet the two arms at different places, so each arm is only as wide as the plates where they meet it. Near
+  the coxa servo the arms are as narrow as without a twist, and they widen towards the plates: neighbouring legs are
+  closest to each other near the body.
+* **Femur bracket** (tibia twist): the pads between the femur arms and the tibia servo's case become wedges, flat on
+  the arm on one side and on the tilted case face on the other. The screw holes follow the case face.
+* **Body plates**: a femur twist tilts the coxa bracket's side plates towards the coxa axis, so the plates' rounded
+  nose around each coxa gets smaller.
+
+![Example pod 7 with femur twists of 20 degrees and tibia twists of 15 degrees on the front and rear legs](../pictures/cad_twisted_pod.png)
+
+![One of its twisted legs: coxa bracket (orange), femur bracket (green) and tibia (purple)](../pictures/cad_twisted_leg.png)
+
+*Example pod 7 with femur twists of 20 degrees and tibia twists of 15 degrees on the front and rear legs (mirrored),
+and one of those legs on its own: coxa bracket in orange, femur bracket in green, tibia in purple.*
+
+### Example: femur twists of 30 and 40 degrees
+
+Example pod 7 with longer coxas, the front legs' femurs twisted by 30 degrees and the rear legs' by 40 (their mirror
+images get the opposite twists):
+
+```
+reset 7
+design import
+set_femur_twist 1 -30
+set_femur_twist 5 40
+set_coxa_length all 70
+export_cad twisted9
+```
+
+![The twisted9 export in Fusion 360](../pictures/cad_twisted_fusion.png)
+
+*The `twisted9` export in Fusion 360.*
+
+The export reports:
+
+```
+No collisions in the rest pose
+Neighbouring legs: clear while their coxas turn 5 degrees towards each other. Legs 4 and 5 collide at 10 degrees (leg4_coxa_bracket and leg5_coxa_bracket). A larger body gives the legs more room (design scale).
+```
+
+The rear legs' coxa brackets, tilted by 40 degrees, leave each other little room. A larger body moves the legs apart:
+with `design scale 1.15` (or `design radius 76`: pod 7's legs are mounted 66 mm from the centre) before
+`export_cad`, the rear legs can turn 15 degrees towards each other before their tibias meet.
+
+### Limits
+
+How far a joint can be twisted depends on the servo: the twisted servo has to stay clear of the arms it sits between.
+For the example pods:
+
+| | Femur twist | Tibia twist |
+|---|---|---|
+| AX-12A (pod 6) | Up to 21 degrees | Up to 21 degrees |
+| STS3215 (pod 7) | Up to about 20 degrees with pod 7's 52 mm coxa; 30 degrees with a 62 mm coxa | Up to 45 degrees |
+
+A twist that is too large stops the export with the reason, for example "the femur twist of -25.0 degrees turns the
+femur servo into the arms of the coxa bracket. With this servo, at most 21.0 degrees fit", or "the coxa is too short
+... A femur twist tilts the coxa bracket's side plates towards the coxa axis: make the coxa longer or the twist
+smaller".
+
+Coxa twists can't be exported yet: they tilt the coxa servos, and the body plates are built for upright coxa servos.
 
 ## How a servo sits on its joint
 

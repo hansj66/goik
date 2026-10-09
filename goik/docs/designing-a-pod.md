@@ -10,6 +10,7 @@ Lengths are in mm and angles in degrees. The examples show the shell's output wi
 * [How a pod is described](#how-a-pod-is-described): coordinates, legs, joint angles and leg numbers
 * [Designing the body](#designing-the-body): templates, adding and moving legs, the outline
 * [Segment lengths and joint angles](#segment-lengths-and-joint-angles)
+* [Twisted joints](#twisted-joints): joint axes that aren't horizontal or vertical, and the insect example
 * [Stance: how high the pod stands](#stance-how-high-the-pod-stands)
 * [Pods without a design](#pods-without-a-design)
 * [Servos, saving and next steps](#servos-saving-and-next-steps)
@@ -54,6 +55,7 @@ Leg 0: femur -16.6, tibia 106.6 degrees, foot 67 mm out from the femur joint
 ...
 Leg 5: femur -16.6, tibia 106.6 degrees, foot 67 mm out from the femur joint
 The feet can step 90 mm around the neutral stance (with the default step height of 50 mm)
+Stability margin: the centre of the body is 90 mm inside the feet's support polygon
 Possible heights with these reach settings: 85 to 175 mm
 ```
 
@@ -185,6 +187,8 @@ design move 0 55 10      # move leg 0 (and its mirror image) to (55, 10), keepin
 design move 0 55 10 20   # ... and turn it to a mount angle of 20 degrees
 design angle 1 70        # turn leg 1's mount (and its mirror image's, to 110 degrees)
 design remove 2          # remove leg 2 (and its mirror image)
+design scale 1.2         # make the body 20% larger: every leg moves out from the centre, the legs stay the same
+design radius 90         # the same, to a size: the leg mount furthest from the centre ends up 90 mm from it
 ```
 
 A new leg is a copy of the first leg in the design. Changing the number of legs can change the gait, and resets the
@@ -267,6 +271,92 @@ the pod's stance sets the femur and tibia rest angles. Change the stance ('stanc
 Changing a segment length while the pod has a stance recomputes the femur and tibia angles, so the body keeps its
 height.
 
+## Twisted joints
+
+Each joint's rotation axis can be turned ("twisted") about the link that leads into the joint. The joint still turns
+in a plane, but that plane doesn't have to be horizontal or vertical any more. With all twists 0 (the default) the leg
+is the standard leg described [above](#a-leg).
+
+| Twist | The axis is turned about | 0 | What it does |
+|---|---|---|---|
+| Coxa twist | The mount direction (out from the body) | The coxa axis is vertical | The coxa swings on a tilted cone instead of a flat circle |
+| Femur twist | The coxa | The femur axis is horizontal, square to the coxa | The femur and tibia swing in a plane that leans sideways |
+| Tibia twist | The femur | The tibia axis is parallel to the femur axis | The foot swings out of the femur's plane |
+
+A positive twist turns the axis counter clockwise, seen from the end of the link looking back towards the body.
+Twists are limited to 45 degrees either way, to keep the brackets printable.
+
+![The three joint twists](../pictures/design_twists.png)
+
+```
+set_coxa_twist <ALL | leg> <degrees>
+set_femur_twist <ALL | leg> <degrees>
+set_tibia_twist <ALL | leg> <degrees>
+```
+
+With a design, the mirror image gets the opposite twist, so the pod stays symmetric:
+
+```
+set_femur_twist 1 -20
+```
+```
+Changing femur twist of leg 1 to -20.00 (and of leg 2, its mirror image)
+```
+
+A leg on the symmetry axis can't be twisted, since it is its own mirror image. `design` shows the twists of each leg
+(coxa / femur / tibia), and they are saved with the pod.
+
+### Twists move the feet
+
+Twisting a joint moves the foot, usually forwards or backwards along the body. The same twist on every leg moves every
+foot the same way, so the centre of the body ends up near one end of the feet's support polygon, and the pod becomes
+easy to tip over while it lifts a foot. Balance the twists instead: twist the front legs one way and the rear legs the
+other. `stance` shows the stability margin, how far the centre of the body is inside the support polygon:
+
+```
+stance
+```
+```
+...
+Stability margin: the centre of the body is 142 mm inside the feet's support polygon
+```
+
+For the rectangular quick start pod, the same femur twist of 25 degrees on all legs moves the feet 47 mm back and cuts
+the margin from 90 to 43 mm. Front legs twisted forward and rear legs back keep it at 85 mm.
+
+### Example: the insect (example pod 8)
+
+`reset 8` loads an insect like hexapod: a long, narrow body carried low, short coxas, and knees high above the body.
+The front legs are swept forward and twisted so their feet reach forward; the rear legs mirror that backwards:
+
+```
+Legs 0 (+X) and 3 (-X): (25.00, 0.00), mount angle 0.00, coxa 25.00, femur 70.00, tibia 110.00 mm, rest angles 0.00 / -41.54 / 108.75
+Legs 1 (+X) and 2 (-X): (25.00, 75.00), mount angle 0.00, coxa 25.00, femur 70.00, tibia 110.00 mm, rest angles 35.00 / -29.67 / 107.10, twists -15.0 / -25.0 / 15.0
+Legs 5 (+X) and 4 (-X): (25.00, -75.00), mount angle 0.00, coxa 25.00, femur 70.00, tibia 110.00 mm, rest angles -35.00 / -29.67 / 107.10, twists 15.0 / 25.0 / -15.0
+```
+
+![The insect seen in 3D, from above and from the side](../pictures/insect_3d.png)
+
+Walking an arc (`walk 0 50 15`) with the front of the body raised (`pitch 8`):
+
+![The insect walking in the simulator](../pictures/insect_simulator.png)
+
+The insect is a showcase for twisted joints: its coxas are too short for real servos.
+
+### Stance and walking with twists
+
+A stance works with twisted legs. Their femur and tibia angles have no simple formula, so they are solved numerically,
+with the same checks. A tibia generally can't stand vertical on a twisted leg, so the default reach is the one a
+vertical tibia would give without the twists.
+
+The gait engine's inverse kinematics (finding the joint angles that put a foot where it should be) also works
+numerically for twisted legs. See [kinematics.md](kinematics.md#twisted-joints).
+
+The CAD export builds printable brackets for femur and tibia twists, within limits that depend on the servo (21
+degrees for the AX-12A). Coxa twists can't be exported yet. Twisted brackets take more room: if neighbouring legs
+collide, make the body larger with `design scale`. See [cad-export.md](cad-export.md#twisted-joints), with an
+example exported to Fusion 360.
+
 ## Stance: how high the pod stands
 
 A stance says where the feet are, and the femur and tibia rest angles are computed from it:
@@ -288,7 +378,8 @@ stance off             # set the femur and tibia angles by hand again (they stay
 ```
 
 `stance` shows the computed angles, how far the feet can step around the neutral stance (this limits the stride when
-walking), and the range of heights that work with the reach settings. For the quick start pod with 130 mm tibias:
+walking), the stability margin (how far the centre of the body is inside the feet's support polygon), and the range
+of heights that work with the reach settings. For the quick start pod with 130 mm tibias:
 
 ```
 stance reach 0 125
@@ -302,6 +393,7 @@ Leg 3: femur -13.9, tibia 77.9 degrees, foot 125 mm out from the femur joint (se
 Leg 4: femur -18.7, tibia 89.1 degrees, foot 110 mm out from the femur joint
 Leg 5: femur -18.7, tibia 89.1 degrees, foot 110 mm out from the femur joint
 The feet can step 45 mm around the neutral stance (with the default step height of 50 mm)
+Stability margin: the centre of the body is 90 mm inside the feet's support polygon
 Possible heights with these reach settings: 10 to 135 mm
 ```
 
@@ -361,7 +453,8 @@ stance 130 80
 * Walk it: `walk 0 60 0`, `walk 0 0 20` (turn), `gait wave`, `halt`, or drive it with a gamepad. See
   [simulator.md](simulator.md) and [scripts.md](scripts.md).
 * `export_cad <name>` exports it to a STEP assembly with printable brackets, and checks the rest pose for collisions
-  between the servos and brackets. See [cad-export.md](cad-export.md).
+  between the servos and brackets (femur and tibia twists are supported, coxa twists not yet). See
+  [cad-export.md](cad-export.md).
 
 ## Command reference
 
@@ -379,6 +472,8 @@ stance 130 80
 | `design remove <leg>` | Remove a leg and its mirror image |
 | `design outline <x y x y ...>` | Set the +X half of the body outline |
 | `design outline auto` | An outline through the legs' mount points |
+| `design scale <factor>` | Make the body larger (factor above 1) or smaller: the leg mounts and the outline move away from or towards the centre. The legs, their twists and the stance stay |
+| `design radius <mm>` | Scale the body (like `design scale`) so the leg mount furthest from the centre is `<mm>` from it. `design` shows the current radius |
 | `design off` | Drop the design (the pod keeps its shape) |
 
 ### Legs
@@ -388,6 +483,7 @@ stance 130 80
 | `set_coxa_length <ALL \| leg> <mm>` | Coxa length. Also `set_femur_length` and `set_tibia_length` |
 | `set_coxa_angle <ALL \| leg> <degrees>` | Coxa rest angle |
 | `set_femur_angle <ALL \| leg> <degrees>` | Femur rest angle (only without a stance). Also `set_tibia_angle` |
+| `set_coxa_twist <ALL \| leg> <degrees>` | Twist of the coxa axis (-45 to 45). Also `set_femur_twist` and `set_tibia_twist` |
 | `effectors` | Print the foot positions |
 
 ### Stance
@@ -396,5 +492,5 @@ stance 130 80
 |---|---|
 | `stance <height> [reach \| vertical]` | Set the body's height above the ground, and optionally the reach |
 | `stance reach <leg> <reach \| default>` | The reach of one leg (and its mirror image) |
-| `stance` | Show the stance, the angles per leg, how far the feet can step and the possible heights |
+| `stance` | Show the stance, the angles per leg, how far the feet can step, the stability margin and the possible heights |
 | `stance off` | Remove the stance; set the femur and tibia rest angles by hand |

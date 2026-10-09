@@ -158,15 +158,15 @@ type Controller struct {
 // NewController returns a controller with the default settings
 func NewController() *Controller {
 	return &Controller{
-		Enabled:    true,
+		Enabled:         true,
 		StickDeadZone:   0.25,
 		TriggerDeadZone: 0.15,
-		Expo:       0.6,
-		SpeedSteps: []float64{25, 50, 75, 100, 150},
-		speed:      2,
-		MaxYawRate: 45,
-		MaxTilt:    15,
-		HeightStep: 10,
+		Expo:            0.6,
+		SpeedSteps:      []float64{25, 50, 75, 100, 150},
+		speed:           2,
+		MaxYawRate:      45,
+		MaxTilt:         15,
+		HeightStep:      10,
 	}
 }
 

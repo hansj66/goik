@@ -27,6 +27,7 @@ import (
 		position (x, y)   ->  (-x, y)
 		mount angle a     ->  180 - a
 		coxa rest angle c ->  -c        (femur and tibia are unchanged)
+		joint twists      ->  opposite  (see twist.go)
 
 	A leg mounted on the symmetry axis (x = 0) is a single leg pointing forward or backward.
 
@@ -60,6 +61,8 @@ type LegMount struct {
 	Segments SegmentLengths `json:"Segments"`
 	// Rest angles of the leg on the +X side. The mirrored leg's coxa angle is negated
 	Rest ServoAngles `json:"Rest"`
+	// Twists of the joint axes of the leg on the +X side (see twist.go). The mirrored leg's twists are opposite
+	Twists JointTwists `json:"Twists"`
 }
 
 // OnAxis returns true if the leg is on the symmetry axis (a single leg, not a mirrored pair)
@@ -85,6 +88,7 @@ type DesignLeg struct {
 	Angle    float64
 	Segments SegmentLengths
 	Rest     ServoAngles
+	Twists   JointTwists
 }
 
 // Clone returns a deep copy of the design
@@ -120,6 +124,12 @@ func (d *PodDesign) Validate() error {
 			if math.Abs(m.Rest.Coxa) > DESIGN_TOLERANCE {
 				return fmt.Errorf("the leg at %s is on the symmetry axis, so its coxa rest angle must be 0, not %.2f", at, m.Rest.Coxa)
 			}
+			if !m.Twists.IsZero() {
+				return fmt.Errorf("the leg at %s is on the symmetry axis, so its joints can't be twisted (it is its own mirror image)", at)
+			}
+		}
+		if err := m.Twists.Validate(); err != nil {
+			return fmt.Errorf("the leg at %s: %w", at, err)
 		}
 	}
 	return nil
@@ -192,13 +202,13 @@ func (d *PodDesign) Legs() ([]DesignLeg, error) {
 	for i, m := range d.Mounts {
 		y := m.Y + 0 // no negative zero
 		if m.OnAxis() {
-			legs = append(legs, DesignLeg{Mount: i, Position: Coordinate{X: 0, Y: y}, Angle: normalizeAngle(m.Angle), Segments: m.Segments, Rest: ServoAngles{Femur: m.Rest.Femur, Tibia: m.Rest.Tibia}})
+			legs = append(legs, DesignLeg{Mount: i, Position: Coordinate{X: 0, Y: y}, Angle: normalizeAngle(m.Angle), Segments: m.Segments, Rest: ServoAngles{Femur: m.Rest.Femur, Tibia: m.Rest.Tibia}, Twists: m.Twists})
 			continue
 		}
-		legs = append(legs, DesignLeg{Mount: i, Position: Coordinate{X: m.X, Y: y}, Angle: normalizeAngle(m.Angle), Segments: m.Segments, Rest: m.Rest})
+		legs = append(legs, DesignLeg{Mount: i, Position: Coordinate{X: m.X, Y: y}, Angle: normalizeAngle(m.Angle), Segments: m.Segments, Rest: m.Rest, Twists: m.Twists})
 		mirrored := m.Rest
 		mirrored.Coxa = 0 - m.Rest.Coxa
-		legs = append(legs, DesignLeg{Mount: i, Mirrored: true, Position: Coordinate{X: -m.X, Y: y}, Angle: normalizeAngle(180 - m.Angle), Segments: m.Segments, Rest: mirrored})
+		legs = append(legs, DesignLeg{Mount: i, Mirrored: true, Position: Coordinate{X: -m.X, Y: y}, Angle: normalizeAngle(180 - m.Angle), Segments: m.Segments, Rest: mirrored, Twists: m.Twists.Mirrored()})
 	}
 
 	if len(legs) < 3 {
@@ -255,6 +265,10 @@ func (d *PodDesign) BodyDefinition(previous *BodyDefinition) (*BodyDefinition, e
 		b.CoxaCoordinates = append(b.CoxaCoordinates, l.Position)
 		b.Segments = append(b.Segments, l.Segments)
 		b.RestAngles = append(b.RestAngles, l.Rest)
+		b.Twists = append(b.Twists, l.Twists)
+	}
+	if !b.HasTwists() {
+		b.Twists = nil
 	}
 
 	gaitType := TRIPOD
@@ -283,9 +297,9 @@ func (d *PodDesign) BodyDefinition(previous *BodyDefinition) (*BodyDefinition, e
 	return b, nil
 }
 
-// SetLeg sets the segment lengths and rest angles of a leg (as seen on that leg). The leg's mirror image
-// changes with it. A leg on the symmetry axis must have a coxa rest angle of 0.
-func (d *PodDesign) SetLeg(leg int, segments SegmentLengths, rest ServoAngles) error {
+// SetLeg sets the segment lengths, rest angles and joint twists of a leg (as seen on that leg). The leg's mirror
+// image changes with it. A leg on the symmetry axis must have a coxa rest angle of 0 and no twists.
+func (d *PodDesign) SetLeg(leg int, segments SegmentLengths, rest ServoAngles, twists JointTwists) error {
 	legs, err := d.Legs()
 	if err != nil {
 		return err
@@ -297,15 +311,23 @@ func (d *PodDesign) SetLeg(leg int, segments SegmentLengths, rest ServoAngles) e
 	m := &d.Mounts[legs[leg].Mount]
 	if legs[leg].Mirrored {
 		rest.Coxa = 0 - rest.Coxa
+		twists = twists.Mirrored()
 	}
 	if m.OnAxis() {
 		if math.Abs(rest.Coxa) > DESIGN_TOLERANCE {
 			return fmt.Errorf("leg %d is on the symmetry axis, so its coxa rest angle must be 0", leg)
 		}
+		if !twists.IsZero() {
+			return fmt.Errorf("leg %d is on the symmetry axis, so its joints can't be twisted (it is its own mirror image)", leg)
+		}
 		rest.Coxa = 0
+	}
+	if err := twists.Validate(); err != nil {
+		return fmt.Errorf("leg %d: %w", leg, err)
 	}
 	m.Segments = segments
 	m.Rest = rest
+	m.Twists = twists
 	return nil
 }
 
@@ -326,6 +348,44 @@ func (d *PodDesign) MoveLeg(leg int, x float64, y float64, angle float64) error 
 	m.X, m.Y, m.Angle = x, y, normalizeAngle(angle)
 	if m.OnAxis() {
 		m.X = 0
+	}
+	return nil
+}
+
+// Radius returns the distance (mm) from the centre of the body to the leg mount furthest from it
+func (d *PodDesign) Radius() float64 {
+	r := 0.0
+	for _, m := range d.Mounts {
+		r = math.Max(r, math.Hypot(m.X, m.Y))
+	}
+	return r
+}
+
+// SetRadius scales the design (see Scale) so the leg mount furthest from the centre is radius mm from it
+func (d *PodDesign) SetRadius(radius float64) error {
+	if radius <= 0 {
+		return fmt.Errorf("the radius must be positive")
+	}
+	current := d.Radius()
+	if current < DESIGN_TOLERANCE {
+		return fmt.Errorf("the design has no legs away from the centre")
+	}
+	return d.Scale(radius / current)
+}
+
+// Scale makes the body larger (factor > 1) or smaller: the leg mounts and the outline move away from or towards the
+// centre of the body. The legs themselves don't change
+func (d *PodDesign) Scale(factor float64) error {
+	if factor <= 0 {
+		return fmt.Errorf("the scale factor must be positive")
+	}
+	for i := range d.Mounts {
+		d.Mounts[i].X = round2(d.Mounts[i].X * factor)
+		d.Mounts[i].Y = round2(d.Mounts[i].Y * factor)
+	}
+	for i := range d.Outline {
+		d.Outline[i].X = round2(d.Outline[i].X * factor)
+		d.Outline[i].Y = round2(d.Outline[i].Y * factor)
 	}
 	return nil
 }
@@ -359,7 +419,7 @@ func NewDesignFromBodyDefinition(b *BodyDefinition) (*PodDesign, error) {
 		if used[i] {
 			continue
 		}
-		c, a, s, r := b.CoxaCoordinates[i], b.CoxaAngles[i], b.Segments[i], b.RestAngles[i]
+		c, a, s, r, tw := b.CoxaCoordinates[i], b.CoxaAngles[i], b.Segments[i], b.RestAngles[i], b.LegTwists(i)
 		if !near(c.Z, 0) {
 			return nil, fmt.Errorf("leg %d is mounted at Z = %.2f. A design has all legs mounted at Z = 0", i, c.Z)
 		}
@@ -371,6 +431,9 @@ func NewDesignFromBodyDefinition(b *BodyDefinition) (*PodDesign, error) {
 			if !near(r.Coxa, 0) {
 				return nil, fmt.Errorf("leg %d is on the symmetry axis (X = 0), but has a coxa rest angle of %.2f", i, r.Coxa)
 			}
+			if !tw.IsZero() {
+				return nil, fmt.Errorf("leg %d is on the symmetry axis (X = 0), but has twisted joints", i)
+			}
 			used[i] = true
 			d.Mounts = append(d.Mounts, LegMount{X: 0, Y: c.Y, Angle: normalizeAngle(a), Segments: s, Rest: ServoAngles{Femur: r.Femur, Tibia: r.Tibia}})
 			continue
@@ -378,25 +441,26 @@ func NewDesignFromBodyDefinition(b *BodyDefinition) (*PodDesign, error) {
 
 		mirror := -1
 		for j := 0; j < b.NumLegs; j++ {
-			cj, sj, rj := b.CoxaCoordinates[j], b.Segments[j], b.RestAngles[j]
+			cj, sj, rj, twj := b.CoxaCoordinates[j], b.Segments[j], b.RestAngles[j], b.LegTwists(j)
 			if j != i && !used[j] && near(cj.X, -c.X) && near(cj.Y, c.Y) && near(cj.Z, c.Z) && nearAngle(b.CoxaAngles[j], 180-a) &&
 				near(sj.Coxa, s.Coxa) && near(sj.Femur, s.Femur) && near(sj.Tibia, s.Tibia) &&
-				near(rj.Coxa, -r.Coxa) && near(rj.Femur, r.Femur) && near(rj.Tibia, r.Tibia) {
+				near(rj.Coxa, -r.Coxa) && near(rj.Femur, r.Femur) && near(rj.Tibia, r.Tibia) &&
+				near(twj.Coxa, -tw.Coxa) && near(twj.Femur, -tw.Femur) && near(twj.Tibia, -tw.Tibia) {
 				mirror = j
 				break
 			}
 		}
 		if mirror == -1 {
-			return nil, fmt.Errorf("leg %d has no mirror image (a leg at (%.2f, %.2f) pointing at %.2f degrees, with the same segment lengths and a coxa rest angle of %.2f). Only pods that are symmetric about the Y axis can be designed",
+			return nil, fmt.Errorf("leg %d has no mirror image (a leg at (%.2f, %.2f) pointing at %.2f degrees, with the same segment lengths, a coxa rest angle of %.2f and opposite twists). Only pods that are symmetric about the Y axis can be designed",
 				i, 0-c.X, c.Y, normalizeAngle(180-a), 0-r.Coxa)
 		}
 		used[i], used[mirror] = true, true
 		if c.X > 0 {
-			d.Mounts = append(d.Mounts, LegMount{X: c.X, Y: c.Y, Angle: normalizeAngle(a), Segments: s, Rest: r})
+			d.Mounts = append(d.Mounts, LegMount{X: c.X, Y: c.Y, Angle: normalizeAngle(a), Segments: s, Rest: r, Twists: tw})
 		} else {
 			mr := b.RestAngles[mirror]
 			mc := b.CoxaCoordinates[mirror]
-			d.Mounts = append(d.Mounts, LegMount{X: mc.X, Y: mc.Y, Angle: normalizeAngle(b.CoxaAngles[mirror]), Segments: s, Rest: mr})
+			d.Mounts = append(d.Mounts, LegMount{X: mc.X, Y: mc.Y, Angle: normalizeAngle(b.CoxaAngles[mirror]), Segments: s, Rest: mr, Twists: b.LegTwists(mirror)})
 		}
 	}
 

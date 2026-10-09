@@ -23,6 +23,9 @@ import (
 // the coxa, femur and tibia angle that results in the end effector moving to the effectorTarget coordinate
 // If a solution can not be found, the function returns an error.
 func SolveEffectorIK(leg *Leg, effectorTarget Coordinate, debugChannel chan string) (ServoAngles, error) {
+	if !leg.Twists.IsZero() {
+		return solveTwistedIK(leg, effectorTarget)
+	}
 
 	var servoAngles ServoAngles
 	// Inverse kinematics equation 1 (ref readme.md)
@@ -69,4 +72,15 @@ func SolveEffectorIK(leg *Leg, effectorTarget Coordinate, debugChannel chan stri
 	servoAngles.Tibia = 180 - (180.0/math.Pi)*math.Acos((L*L-leg.SegmentLengths.Femur*leg.SegmentLengths.Femur-leg.SegmentLengths.Tibia*leg.SegmentLengths.Tibia)/(-2*leg.SegmentLengths.Tibia*leg.SegmentLengths.Femur))
 
 	return servoAngles, nil
+}
+
+// solveTwistedIK solves a twisted leg numerically (see twist.go), starting from the leg's current angles
+func solveTwistedIK(leg *Leg, target Coordinate) (ServoAngles, error) {
+	const toRadians = math.Pi / 180
+	seed := [3]float64{leg.ServoAngles.Coxa * toRadians, leg.ServoAngles.Femur * toRadians, leg.ServoAngles.Tibia * toRadians}
+	q, err := leg.model.solve(vec3{target.X, target.Y, target.Z}, seed)
+	if err != nil {
+		return leg.ServoAngles, err
+	}
+	return ServoAngles{Coxa: wrapDegrees(q[0] / toRadians), Femur: wrapDegrees(q[1] / toRadians), Tibia: wrapDegrees(q[2] / toRadians)}, nil
 }

@@ -168,6 +168,31 @@ $\theta_3 = 180 - \beta`$
 
 >Note: It is assumed that the neutral position (centered servos) are at 0 degrees. If this is not the case, a zero offset has to be introduced.
 
+## Twisted joints
+
+The leg above is planar: the coxa axis is vertical, and the femur and tibia axes are horizontal and parallel. A
+[twisted joint](designing-a-pod.md#twisted-joints) turns a joint's axis about the link leading into it. In the
+kinematic chain ([robot/twist.go](../robot/twist.go)) each twist is a rotation about the link's X axis:
+
+| Frame | Transformation |
+|---|---|
+| Mount | T(coxa joint position) Rz(mount angle) Rx(coxa twist) |
+| Coxa joint | Rz(coxa angle) Tx(coxa length) Rx(90 + femur twist) |
+| Femur joint | Rz(femur angle) Tx(femur length) Rx(tibia twist) |
+| Tibia joint | Rz(tibia angle) Tx(tibia length) |
+
+With all twists 0 this is the chain above: the Rx(90) turns the femur axis horizontal.
+
+A twisted leg is no longer planar, so the inverse kinematics has no simple closed form. It is solved numerically with
+damped least squares (Levenberg-Marquardt): the Jacobian is exact (column j is joint j's axis crossed with the lever
+arm from the joint to the foot), and each step solves a 3 x 3 system. Starting from the leg's current angles keeps the
+solution on the same branch (the knee stays on the same side) from one tick to the next, and it converges in a few
+iterations: about 0.8 µs per solve on a desktop PC, against 0.03 µs for the closed form of an untwisted leg. Untwisted
+legs still use the closed form.
+
+The mirror image of a leg (in a design) has the opposite twists, the opposite coxa angle and the same femur and tibia
+angles.
+
 ## Gaits
 
 Moving the pod involves one or more of the legs of the robot being lifted off the ground and being moved in a desired direction. These legs are in the "swing phase". The legs that provide stabilization and are still on the ground are said to be in the "stance phase".

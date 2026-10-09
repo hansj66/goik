@@ -59,6 +59,18 @@ func (s *Shell) executeSetTibiaAngleCmd(args []string) error {
 	return s.setLegValue(args, "set_tibia_angle <ALL | legNum> <angle>", "tibia angle", (*robot.Pod).SetTibiaAngle)
 }
 
+func (s *Shell) executeSetCoxaTwistCmd(args []string) error {
+	return s.setLegValue(args, "set_coxa_twist <ALL | legNum> <angle>", "coxa twist", (*robot.Pod).SetCoxaTwist)
+}
+
+func (s *Shell) executeSetFemurTwistCmd(args []string) error {
+	return s.setLegValue(args, "set_femur_twist <ALL | legNum> <angle>", "femur twist", (*robot.Pod).SetFemurTwist)
+}
+
+func (s *Shell) executeSetTibiaTwistCmd(args []string) error {
+	return s.setLegValue(args, "set_tibia_twist <ALL | legNum> <angle>", "tibia twist", (*robot.Pod).SetTibiaTwist)
+}
+
 // setLegValue sets a segment length or rest angle of one leg, or of ALL legs. When the pod has a design, a
 // leg's mirror image changes with it, so ALL changes the legs on the +X side and the legs on the axis.
 func (s *Shell) setLegValue(args []string, usage string, what string, set func(*robot.Pod, int, float64) error) error {
@@ -134,7 +146,7 @@ func (s *Shell) executeResetCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
 	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('reset <0-7>'): %+v", args)
+		return fmt.Errorf("syntax error ('reset <0-8>'): %+v", args)
 	}
 
 	s.stopScript()
@@ -155,6 +167,8 @@ func (s *Shell) executeResetCmd(args []string) error {
 		s.Pod = robot.NewPod(robot.NewExampleHexapodAX12())
 	} else if args[1] == "7" {
 		s.Pod = robot.NewPod(robot.NewExampleHexapodSTS3215())
+	} else if args[1] == "8" {
+		s.Pod = robot.NewPod(robot.NewExampleInsect())
 	} else {
 		return fmt.Errorf("Unknown example preset")
 	}

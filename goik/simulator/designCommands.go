@@ -23,7 +23,7 @@ import (
 )
 
 const designUsage = "design [import | round <legs> <radius> | rectangle <legs per side> <length> <width> | outline <auto | x y x y ...> | " +
-	"add <x> <y> <angle> | move <leg> <x> <y> [angle] | angle <leg> <angle> | remove <leg> | off]"
+	"add <x> <y> <angle> | move <leg> <x> <y> [angle] | angle <leg> <angle> | remove <leg> | scale <factor> | radius <mm> | off]"
 
 // executeDesignCmd shows or changes the pod's design (see docs/designing-a-pod.md)
 func (s *Shell) executeDesignCmd(args []string) error {
@@ -180,6 +180,24 @@ func (s *Shell) executeDesignCmd(args []string) error {
 			return err
 		}
 
+	case "scale":
+		v, err := numbers(2)
+		if err != nil || len(v) != 1 {
+			return syntaxError
+		}
+		if err := d.Scale(v[0]); err != nil {
+			return err
+		}
+
+	case "radius":
+		v, err := numbers(2)
+		if err != nil || len(v) != 1 {
+			return syntaxError
+		}
+		if err := d.SetRadius(v[0]); err != nil {
+			return err
+		}
+
 	default:
 		return syntaxError
 	}
@@ -217,6 +235,7 @@ func (s *Shell) showDesign() error {
 	}
 
 	s.outputCh <- fmt.Sprintf("Pod design: %d legs, symmetric about the Y axis (+Y is forward). Legs on the -X side mirror those on the +X side (shown)", len(legs))
+	s.outputCh <- fmt.Sprintf("Body radius: %.2f mm (the leg mount furthest from the centre)", d.Radius())
 	if len(d.Outline) == 0 {
 		s.outputCh <- "Outline: none"
 	} else {
@@ -243,8 +262,12 @@ func (s *Shell) showDesign() error {
 		if len(numbers) == 2 {
 			which = fmt.Sprintf("Legs %d (+X) and %d (-X)", numbers[0], numbers[1])
 		}
-		s.outputCh <- fmt.Sprintf("%s: (%.2f, %.2f), mount angle %.2f, coxa %.2f, femur %.2f, tibia %.2f mm, rest angles %.2f / %.2f / %.2f",
+		line := fmt.Sprintf("%s: (%.2f, %.2f), mount angle %.2f, coxa %.2f, femur %.2f, tibia %.2f mm, rest angles %.2f / %.2f / %.2f",
 			which, l.Position.X, l.Position.Y, l.Angle, l.Segments.Coxa, l.Segments.Femur, l.Segments.Tibia, l.Rest.Coxa, l.Rest.Femur, l.Rest.Tibia)
+		if !l.Twists.IsZero() {
+			line += fmt.Sprintf(", twists %.1f / %.1f / %.1f", l.Twists.Coxa, l.Twists.Femur, l.Twists.Tibia)
+		}
+		s.outputCh <- line
 	}
 	return nil
 }
