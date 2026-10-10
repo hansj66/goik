@@ -41,7 +41,14 @@ func (v *IsoView) TranslateY(y float64) int {
 
 func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 	DrawFrame(screen, "Isometric View", v.width, v.height, v.x, v.y, v.legendOffset)
+	centre := p.ViewCentre()
 	joints := p.GroundJoints()
+	for l := range joints {
+		for j := range joints[l] {
+			joints[l][j].X -= centre.X
+			joints[l][j].Y -= centre.Y
+		}
+	}
 
 	angle_z := 0 * math.Pi / 180.0
 	angle_x := 20 * math.Pi / 180.0
@@ -93,7 +100,7 @@ func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 	}
 	var gridLines [][][2]float32
 	for _, l := range GroundGrid(p) {
-		gridLines = append(gridLines, [][2]float32{project(l[0][0], l[0][1], groundZ), project(l[1][0], l[1][1], groundZ)})
+		gridLines = append(gridLines, [][2]float32{project(l[0][0]-centre.X, l[0][1]-centre.Y, groundZ), project(l[1][0]-centre.X, l[1][1]-centre.Y, groundZ)})
 	}
 	StrokePaths(Clip(screen, v.x, v.y, v.width, v.height), gridLines, 1, GridClr())
 
@@ -116,25 +123,25 @@ func (v *IsoView) Render(screen *ebiten.Image, p *robot.Pod) {
 		}
 	}
 
-	// Draw body frame
-	for l := 0; l < p.BodyDefinition.NumLegs-1; l++ {
-		vector.StrokeLine(screen,
-			float32(v.TranslateX(IsoJoints[l][0].X)),
-			float32(v.TranslateY(IsoJoints[l][0].Z)),
-			float32(v.TranslateX(IsoJoints[l+1][0].X)),
-			float32(v.TranslateY(IsoJoints[l+1][0].Z)),
-			5,
-			White(),
-			true)
+	// Draw body frame: the segments of a segmented body, or a polygon through the coxa joints
+	if p.BodyDefinition.IsSegmented() {
+		DrawSegmentedBody(screen, p, func(c robot.Coordinate) [2]float32 {
+			return project(c.X-centre.X, c.Y-centre.Y, c.Z)
+		})
+	} else {
+		n := p.BodyDefinition.NumLegs
+		for l := 0; l < n; l++ {
+			next := (l + 1) % n
+			vector.StrokeLine(screen,
+				float32(v.TranslateX(IsoJoints[l][0].X)),
+				float32(v.TranslateY(IsoJoints[l][0].Z)),
+				float32(v.TranslateX(IsoJoints[next][0].X)),
+				float32(v.TranslateY(IsoJoints[next][0].Z)),
+				5,
+				White(),
+				true)
+		}
 	}
-	vector.StrokeLine(screen,
-		float32(v.TranslateX(IsoJoints[p.BodyDefinition.NumLegs-1][0].X)),
-		float32(v.TranslateY(IsoJoints[p.BodyDefinition.NumLegs-1][0].Z)),
-		float32(v.TranslateX(IsoJoints[0][0].X)),
-		float32(v.TranslateY(IsoJoints[0][0].Z)),
-		5,
-		White(),
-		true)
 
 	// Draw Coxa, Femur and Tibia
 	for j := 0; j < robot.NUM_JOINTS-1; j++ {

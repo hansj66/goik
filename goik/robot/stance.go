@@ -228,6 +228,9 @@ func StanceHeightRange(b *BodyDefinition) (lowest float64, highest float64, ok b
 // applyStance sets the body definition's stance and the rest angles it gives. Its design (if any) gets the
 // new rest angles too. The body definition is unchanged if the stance is not possible.
 func applyStance(b *BodyDefinition, s *Stance) error {
+	if b.IsSegmented() {
+		return fmt.Errorf("a segmented body can't have a stance (yet)")
+	}
 	test := *b
 	test.Stance = s
 	angles, err := StanceRestAngles(&test)

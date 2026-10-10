@@ -18,6 +18,7 @@ import (
 	"GOIK/robot"
 	"fmt"
 	"image/color"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -44,13 +45,21 @@ func (v *GaitView) RenderGait(screen *ebiten.Image, legend string, x_legend floa
 
 	var width float32 = 50
 	var height float32 = 40
+	// Many legs: smaller rows, so the table fits above the status lines, and a label on every few rows
+	if fit := (v.y + v.height - 110 - y) / float32(p.BodyDefinition.NumLegs); fit < height {
+		height = fit
+		width = 30
+	}
+	labelEvery := int(math.Ceil(14 / float64(height)))
 
 	ebitenutil.DebugPrintAt(screen, legend, int(v.x+v.legendOffset), int(y-2*v.legendOffset))
 
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Gait cycles: %2.1f", p.GaitCycles()), int(v.x+v.legendOffset), int(y-4*v.legendOffset))
 
 	for leg := 0; leg < p.BodyDefinition.NumLegs; leg++ {
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Leg: %d", leg), int(x_legend), int(y+float32(leg)*height))
+		if leg%labelEvery == 0 {
+			ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Leg: %d", leg), int(x_legend), int(y+float32(leg)*height))
+		}
 		for step := 0; step < p.BodyDefinition.Gait.NumIndicesInPattern; step++ {
 			var color color.Color
 			if (*p.BodyDefinition.Gait.Pattern)[leg][step] == 1 { // Swing

@@ -58,6 +58,8 @@ type Leg struct {
 	SegmentLengths SegmentLengths
 	// Twists of the joints' rotation axes (see twist.go). All 0 is the standard leg
 	Twists JointTwists
+	// A fixed coxa: the leg has two joints (femur and tibia) and moves in one plane
+	FixedCoxa bool
 	// The kinematic chain for the numeric inverse kinematics of twisted legs
 	model legModel
 	// The Joints array contain the location of the reference
@@ -189,4 +191,21 @@ func MountMatrix(position Coordinate, mountAngle float64, coxaTwist float64) *ma
 		r[2][0], r[2][1], r[2][2], position.Z,
 		0, 0, 0, 1,
 	})
+}
+
+// reaches returns true if the leg can put its foot on the target. A two joint leg only reaches targets in its plane,
+// so a target outside the plane counts as reached if the foot is no further from it than the plane is
+func (l *Leg) reaches(target Coordinate, debugChannel chan string) bool {
+	angles, err := SolveEffectorIK(l, target, debugChannel)
+	if err != nil {
+		return false
+	}
+	if !l.FixedCoxa {
+		return true
+	}
+	const toRadians = math.Pi / 180
+	joints, axes := l.model.forward([3]float64{angles.Coxa * toRadians, angles.Femur * toRadians, angles.Tibia * toRadians})
+	t := vec3{target.X, target.Y, target.Z}
+	outside := math.Abs(t.sub(joints[1]).dot(axes[1]))
+	return t.sub(joints[3]).length() <= outside+1
 }

@@ -34,6 +34,15 @@ func withButton(s GamepadState, b Button) GamepadState {
 	return s
 }
 
+// hold keeps the gamepad in a state long enough for the controller to take over, and returns the last command
+func hold(c *Controller, s GamepadState) Command {
+	var cmd Command
+	for i := 0; i < ENGAGE_UPDATES; i++ {
+		cmd = c.Update(s)
+	}
+	return cmd
+}
+
 func near(a, b float64) bool {
 	return math.Abs(a-b) < 1e-9
 }
@@ -59,7 +68,7 @@ func TestSticksDriveThePod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewController()
 			c.Update(connected())
-			cmd := c.Update(tt.state)
+			cmd := hold(c, tt.state)
 			if !cmd.Drive || !cmd.TakeOver {
 				t.Fatalf("drive %v, take over %v: want both", cmd.Drive, cmd.TakeOver)
 			}
@@ -86,7 +95,7 @@ func TestDeadZoneAndRelease(t *testing.T) {
 	}
 
 	// Turning with the right stick doesn't pitch from the other axis's drift
-	if cmd := c.Update(withAxis(drift, RightStickX, 1)); cmd.Pitch != 0 || !near(cmd.Twist.Yaw, 45) {
+	if cmd := hold(c, withAxis(drift, RightStickX, 1)); cmd.Pitch != 0 || !near(cmd.Twist.Yaw, 45) {
 		t.Errorf("turning with drift: %+v, want yaw 45 without pitch", cmd)
 	}
 	c.Update(connected())
@@ -94,7 +103,7 @@ func TestDeadZoneAndRelease(t *testing.T) {
 
 	// Take over once, keep driving, then stop and level once when released
 	walk := withAxis(withAxis(connected(), LeftStickY, -1), RightStickY, 1)
-	if cmd := c.Update(walk); !cmd.TakeOver {
+	if cmd := hold(c, walk); !cmd.TakeOver {
 		t.Errorf("no take over")
 	}
 	if cmd := c.Update(walk); cmd.TakeOver || !cmd.Drive || !near(cmd.Pitch, 15) {
@@ -113,7 +122,7 @@ func TestHaltUntilTheSticksAreReleased(t *testing.T) {
 	c := NewController()
 	c.Update(connected())
 	walk := withAxis(connected(), LeftStickY, -1)
-	c.Update(walk)
+	hold(c, walk)
 
 	if cmd := c.Update(withButton(walk, ButtonB)); !cmd.Twist.IsZero() {
 		t.Errorf("B didn't halt: %+v", cmd)
@@ -122,7 +131,7 @@ func TestHaltUntilTheSticksAreReleased(t *testing.T) {
 		t.Errorf("walking again before the stick was released: %+v", cmd)
 	}
 	c.Update(connected())
-	if cmd := c.Update(walk); !near(cmd.Twist.Y, 75) {
+	if cmd := hold(c, walk); !near(cmd.Twist.Y, 75) {
 		t.Errorf("not walking after the stick was released and pushed again: %+v", cmd)
 	}
 }
@@ -180,7 +189,7 @@ func TestViewButtonTurnsControlOff(t *testing.T) {
 	c := NewController()
 	c.Update(connected())
 	walk := withAxis(connected(), LeftStickY, -1)
-	c.Update(walk)
+	hold(c, walk)
 
 	cmd := c.Update(withButton(walk, ButtonView))
 	if c.Enabled || !cmd.Drive || !cmd.Twist.IsZero() {
@@ -201,12 +210,31 @@ func TestDisconnectHalts(t *testing.T) {
 	if cmd := c.Update(connected()); !strings.Contains(strings.Join(cmd.Messages, " "), "connected: Test pad") {
 		t.Errorf("messages %v", cmd.Messages)
 	}
-	c.Update(withAxis(connected(), LeftStickY, -1))
+	hold(c, withAxis(connected(), LeftStickY, -1))
 	cmd := c.Update(GamepadState{})
 	if !cmd.Drive || !cmd.Twist.IsZero() || c.Engaged() {
 		t.Errorf("disconnect: %+v, want a stop", cmd)
 	}
 	if c.Status() != "Gamepad: not connected" {
 		t.Errorf("status '%s'", c.Status())
+	}
+}
+
+func TestATwitchDoesNotTakeOver(t *testing.T) {
+	c := NewController()
+	c.Update(connected())
+	// A resting stick that jumps out of its dead zone for a moment
+	twitch := withAxis(connected(), RightStickY, 0.4)
+	for i := 0; i < ENGAGE_UPDATES-1; i++ {
+		if cmd := c.Update(twitch); cmd.TakeOver || cmd.Drive {
+			t.Fatalf("update %d of a twitch: %+v", i, cmd)
+		}
+	}
+	if cmd := c.Update(connected()); cmd.TakeOver || cmd.Drive || c.Engaged() {
+		t.Errorf("after a twitch: %+v, want nothing", cmd)
+	}
+	// A button acts at once
+	if cmd := c.Update(withButton(connected(), ButtonA)); !cmd.TakeOver || cmd.Gait != "tripod" {
+		t.Errorf("button: %+v, want an immediate take over", cmd)
 	}
 }

@@ -1,0 +1,28 @@
+# Centipede demo. Load the centipede and run it with: reset 9, then run centipede
+#
+# Velocities: walk 0 <forward mm/s> <turn degrees/s> [for <seconds>]. Positive turns are to the right.
+# A centipede can't walk sideways, and its body follows the head along the path the head walks.
+
+gait metachronal
+walk 0 50 0 for 5          # straight ahead: watch the wave of steps run from the head to the tail
+
+walk 0 40 -25 for 3        # slalom: a curve to the left ...
+walk 0 40 25 for 3         # ... and to the right. The body follows the head through each bend
+repeat 3                   # left, right, three times
+
+walk 0 40 0 for 4          # straighten out
+
+walk 0 40 -20 for 18       # a full circle to the left (360 degrees at 20 degrees/s)
+walk 0 40 0 for 3
+walk 0 40 20 for 18        # and one to the right
+
+walk 0 70 0 for 4          # faster
+walk 0 20 0 for 4          # and slow
+halt
+
+walk 0 0 -20 for 2         # turn the head on the spot: only the first joint bends, up to its limit
+walk 0 0 20 for 3          # the other way
+walk 0 40 0 for 5          # walking on, the body follows the head out of the bend
+
+walk 0 -30 0 for 5         # backwards: the body backs up along the path it came
+halt

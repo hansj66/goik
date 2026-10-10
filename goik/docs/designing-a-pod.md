@@ -434,7 +434,8 @@ The stance is saved with the pod. If the number of legs changes, the per leg rea
 ## Pods without a design
 
 Pods that aren't symmetric about the Y axis (example pods 3, 4 and 5), and pods after `design off`, are designed leg
-by leg. The leg commands then change only the leg you name, and `ALL` changes every leg the same way. Note that a
+by leg. Segmented bodies (the centipede, example pod 9) can't be designed with `design` yet: see
+[centipede.md](centipede.md). The leg commands then change only the leg you name, and `ALL` changes every leg the same way. Note that a
 positive coxa angle sweeps a leg on the +X side forward, but a leg on the -X side backward.
 
 The mount positions and mount angles of such pods can only be changed in code (robot/examplePods.go). A stance works

@@ -30,7 +30,7 @@ func NewXzView(x float32, y float32, width float32, height float32) *XzView {
 }
 
 func (v *XzView) TranslateX(x float64) int {
-	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x)
+	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x-v.centre.X)
 }
 
 func (v *XzView) TranslateY(y float64) int {
@@ -39,7 +39,16 @@ func (v *XzView) TranslateY(y float64) int {
 
 func (v *XzView) Render(screen *ebiten.Image, p *robot.Pod) {
 	DrawFrame(screen, "XZ View", v.width, v.height, v.x, v.y, v.legendOffset)
+	v.centre = p.ViewCentre()
 	joints := p.GroundJoints()
+
+	if p.BodyDefinition.IsSegmented() {
+		DrawSegmentedBody(screen, p, func(c robot.Coordinate) [2]float32 {
+			return [2]float32{float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Z))}
+		})
+		v.renderLegs(screen, p, joints)
+		return
+	}
 
 	// Draw body frame
 	for l := 0; l < p.BodyDefinition.NumLegs-1; l++ {
@@ -61,6 +70,11 @@ func (v *XzView) Render(screen *ebiten.Image, p *robot.Pod) {
 		White(),
 		true)
 
+	v.renderLegs(screen, p, joints)
+}
+
+// renderLegs draws the legs and their joints
+func (v *XzView) renderLegs(screen *ebiten.Image, p *robot.Pod, joints [][robot.NUM_JOINTS]robot.Coordinate) {
 	// Draw Coxa, Femur and Tibia
 	for j := 0; j < robot.NUM_JOINTS-1; j++ {
 		for l := 0; l < p.BodyDefinition.NumLegs; l++ {
@@ -85,5 +99,4 @@ func (v *XzView) Render(screen *ebiten.Image, p *robot.Pod) {
 			vector.DrawFilledCircle(screen, float32(v.TranslateX(j.X)), float32(v.TranslateY(j.Z)), 5, Red(), true)
 		}
 	}
-
 }

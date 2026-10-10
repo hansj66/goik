@@ -44,6 +44,9 @@ func (s *Shell) executeDesignCmd(args []string) error {
 		return values, nil
 	}
 	syntaxError := fmt.Errorf("syntax error ('%s'): %+v", designUsage, args)
+	if s.Pod.BodyDefinition.IsSegmented() {
+		return fmt.Errorf("a segmented body can't be designed with 'design' (yet)")
+	}
 
 	// The legs of a new design get the current pod's leg 0, pointing straight out
 	segments, rest := s.Pod.BodyDefinition.Segments[0], s.Pod.BodyDefinition.RestAngles[0]

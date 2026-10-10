@@ -137,6 +137,38 @@ func GroundGrid(p *robot.Pod) [][2][2]float64 {
 	return lines
 }
 
+func SegmentClr() color.Color {
+	return color.RGBA{220, 220, 220, 255}
+}
+
+func SegmentJointClr() color.Color {
+	return color.RGBA{230, 190, 60, 255}
+}
+
+// Points around a segment's ellipse
+const SEGMENT_OUTLINE_POINTS = 24
+
+// DrawSegmentedBody draws a segmented body: each segment as an ellipse, and each joint between segments as a small
+// circle. project maps a point in the ground frame to the screen
+func DrawSegmentedBody(screen *ebiten.Image, p *robot.Pod, project func(robot.Coordinate) [2]float32) {
+	body := p.BodyDefinition.Body
+	var outlines [][][2]float32
+	for _, pose := range p.SegmentPoses() {
+		var outline [][2]float32
+		for i := 0; i <= SEGMENT_OUTLINE_POINTS; i++ {
+			a := 2 * math.Pi * float64(i) / SEGMENT_OUTLINE_POINTS
+			c := robot.Coordinate{X: body.Width / 2 * math.Cos(a), Y: body.Length / 2 * math.Sin(a)}
+			outline = append(outline, project(pose.ToParent(c)))
+		}
+		outlines = append(outlines, outline)
+	}
+	StrokePaths(screen, outlines, 2, SegmentClr())
+	for _, j := range p.SegmentJoints() {
+		s := project(j)
+		vector.DrawFilledCircle(screen, s[0], s[1], 4, SegmentJointClr(), true)
+	}
+}
+
 // Clip returns the part of the screen covered by a view. Drawing on it is clipped to the view.
 func Clip(screen *ebiten.Image, x float32, y float32, width float32, height float32) *ebiten.Image {
 	return screen.SubImage(image.Rect(int(x), int(y), int(x+width), int(y+height))).(*ebiten.Image)
@@ -148,13 +180,16 @@ type View interface {
 	SetBounds(x float32, y float32, width float32, height float32)
 }
 
-// frame is the part of the screen a view draws in. The views draw at 1 pixel per mm, centred in their frame.
+// frame is the part of the screen a view draws in. The views draw at 1 pixel per mm, centred in their frame on the
+// pod's view centre (see Pod.ViewCentre)
 type frame struct {
 	x            float32
 	y            float32
 	width        float32
 	height       float32
 	legendOffset float32
+	// The point (ground frame, mm) drawn in the middle of the frame
+	centre robot.Coordinate
 }
 
 func newFrame(x float32, y float32, width float32, height float32) frame {

@@ -2,7 +2,9 @@
 
 A script is a text file with one command per line, in the `scripts` folder with the extension `.goik`. Run it with
 `run <name>`; `scripts` lists them, and `abort` (or a manual `walk` or `halt`) stops a running script. The current
-line is shown at the bottom of the simulator window. See [scripts/demo.goik](../scripts/demo.goik) for an example.
+line is shown at the bottom of the simulator window. See [scripts/demo.goik](../scripts/demo.goik) for an example, and
+[scripts/centipede.goik](../scripts/centipede.goik) for the centipede (`reset 9`, then `run centipede`): a slalom,
+circles to the left and right, changes of speed, turning the head on the spot and walking backwards.
 
 ```
 # Everything after '#' is a comment
@@ -23,7 +25,7 @@ level
 
 | Command | Does |
 |---|---|
-| `gait <tripod \| ripple \| wave>` | Blend into a new gait |
+| `gait <tripod \| ripple \| wave \| metachronal>` | Blend into a new gait |
 | `walk <x> <y> <yaw>` | Set the body velocity (mm/s, mm/s, degrees/s) and continue with the next line |
 | `walk <x> <y> <yaw> for <seconds>` | ... and keep it for a while |
 | `walk <x> <y> <yaw> cycles <n>` | ... and keep it for a number of gait cycles |

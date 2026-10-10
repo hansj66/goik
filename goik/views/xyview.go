@@ -38,11 +38,11 @@ func NewXyView(x float32, y float32, width float32, height float32) *XyView {
 }
 
 func (v *XyView) TranslateX(x float64) int {
-	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x)
+	return int(v.x) + int(v.width)/2 - int(v.legendOffset) + int(x-v.centre.X)
 }
 
 func (v *XyView) TranslateY(y float64) int {
-	return int(v.y) + int(v.height)/2 - int(v.legendOffset) + int(y)
+	return int(v.y) + int(v.height)/2 - int(v.legendOffset) + int(y-v.centre.Y)
 }
 
 // Number of positions kept per foot for the trail
@@ -55,6 +55,7 @@ const PATH_RESOLUTION = 2.0
 func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 
 	DrawFrame(screen, "XY View ", v.width, v.height, v.x, v.y, v.legendOffset)
+	v.centre = p.ViewCentre()
 	joints := p.GroundJoints()
 	n := p.BodyDefinition.NumLegs
 
@@ -80,8 +81,8 @@ func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 	}
 
 	// Neutral foot positions
-	for _, l := range p.Legs {
-		c := l.NeutralEffectorCoordinate
+	for l := range p.Legs {
+		c := neutralInGround(p, l)
 		vector.StrokeCircle(screen, float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y)), 4, 1, NeutralClr(), true)
 	}
 
@@ -99,22 +100,31 @@ func (v *XyView) Render(screen *ebiten.Image, p *robot.Pod) {
 	if p.Engine != nil {
 		for l := range p.Legs {
 			if t, swinging := p.Engine.LandingTarget(l); swinging {
+				if p.BodyDefinition.IsSegmented() {
+					t = p.LegToGround(l, t)
+				}
 				vector.StrokeCircle(screen, float32(v.TranslateX(t.X)), float32(v.TranslateY(t.Y)), 8, 2, Blue(), true)
 			}
 		}
 	}
 
 	// Draw body frame
-	for l := 0; l < n; l++ {
-		next := (l + 1) % n
-		vector.StrokeLine(screen,
-			float32(v.TranslateX(joints[l][0].X)),
-			float32(v.TranslateY(joints[l][0].Y)),
-			float32(v.TranslateX(joints[next][0].X)),
-			float32(v.TranslateY(joints[next][0].Y)),
-			5,
-			White(),
-			true)
+	if p.BodyDefinition.IsSegmented() {
+		DrawSegmentedBody(screen, p, func(c robot.Coordinate) [2]float32 {
+			return [2]float32{float32(v.TranslateX(c.X)), float32(v.TranslateY(c.Y))}
+		})
+	} else {
+		for l := 0; l < n; l++ {
+			next := (l + 1) % n
+			vector.StrokeLine(screen,
+				float32(v.TranslateX(joints[l][0].X)),
+				float32(v.TranslateY(joints[l][0].Y)),
+				float32(v.TranslateX(joints[next][0].X)),
+				float32(v.TranslateY(joints[next][0].Y)),
+				5,
+				White(),
+				true)
+		}
 	}
 
 	// Draw Coxa, Femur and Tibia
@@ -197,4 +207,14 @@ func (v *XyView) updateTrails(joints [][robot.NUM_JOINTS]robot.Coordinate) {
 		}
 		v.trails[l] = trail
 	}
+}
+
+// neutralInGround returns a leg's neutral foot position in the ground frame. The neutral positions of a one piece body
+// are on the ground, so they don't move with the body's pose
+func neutralInGround(p *robot.Pod, leg int) robot.Coordinate {
+	c := p.Legs[leg].NeutralEffectorCoordinate
+	if p.BodyDefinition.IsSegmented() {
+		return p.LegToGround(leg, c)
+	}
+	return c
 }

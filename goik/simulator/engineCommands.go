@@ -53,6 +53,9 @@ func (s *Shell) executeWalkCmd(args []string) error {
 		return err
 	}
 	s.stopScript()
+	if s.Pod.BodyDefinition.IsSegmented() && c.Values[0] != 0 {
+		s.outputCh <- "A segmented body can't walk sideways: x is ignored"
+	}
 
 	// "walk ... for <s>" and "walk ... cycles <n>" run as a one line script, which halts at the end
 	if c.Duration > 0 || c.Cycles > 0 {

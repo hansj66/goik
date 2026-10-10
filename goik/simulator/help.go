@@ -27,7 +27,7 @@ type helpSection struct {
 
 var helpSections = []helpSection{
 	{"design", "Pod design", []string{
-		"reset <0-8>                                - Load example pod <n> (6: AX-12A servos, 7: STS3215 servos, 8: insect)",
+		"reset <0-9>                                - Load example pod <n> (6: AX-12A, 7: STS3215, 8: insect, 9: centipede)",
 		"save <filename> / load <filename>          - Save / load the pod definition (including servo mapping)",
 		"set_coxa_length <ALL | legNum> <mm>        - Segment lengths (with a design, a leg's mirror image changes with it)",
 		"set_femur_length <ALL | legNum> <mm>",
@@ -60,7 +60,7 @@ var helpSections = []helpSection{
 		"walk <x> <y> <yaw> [for <s> | cycles <n>]  - Walk with velocity x, y (mm/s) and yaw (deg/s).",
 		"                                             Can be changed at any time, transitions are smooth",
 		"halt                                       - Slow down and step back into the neutral stance",
-		"gait <tripod | ripple | wave>              - Select gait (blends smoothly while walking)",
+		"gait <tripod | ripple | wave | metachronal> - Select gait (blends smoothly while walking)",
 		"swing_time <seconds>                       - Duration of a leg swing (default 0.4)",
 		"step_height <mm>                           - Height of the swing arc",
 		"speed <1-10>                               - Simulation speed (10, the default, is real time)",

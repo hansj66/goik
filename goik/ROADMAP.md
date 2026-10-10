@@ -46,7 +46,13 @@
     1. Joint angle panel: each servo's angle against its limits from the servo mapping, highlighting joints near or past a limit
     1. Fix view colours: alpha is 1 instead of 255 (e.g. RGBA{255, 0, 0, 1}), which is invalid for Ebiten's premultiplied colours
     1. Scale bar / units on the axes
-1. Implement metachronal gait (for centipede type robots)
+1. Centipede (segmented bodies): the simulator has a segmented body with yaw joints, two joint legs and the metachronal gait (see [docs/centipede.md](docs/centipede.md)). Next:
+    1. Choose the servos for the legs and the joints between the segments, and size the segments around them
+    1. Servo mapping for the joints between the segments
+    1. Designing segmented bodies in the shell: number of segments, spacing, legs per segment, joint range
+    1. Undulation: a sideways wave along the body on top of following the head, tied to the leg wave
+    1. Body pose for segmented bodies (lifting the head), and pitch joints for uneven ground
+    1. CAD: a printable segment module with the yaw joint and its servo
 1. Gamepad control: the simulator can be driven with a gamepad (see [docs/simulator.md](docs/simulator.md#gamepad)), using the input independent `control` package. Still to do:
     1. Overlord input: Linux joystick device `/dev/input/js0` (Bluetooth gamepad, as in the Overlord remote control example), feeding the same `control` package
     1. Watchdog on Overlord: halt if the input goes quiet (out of range), not only on a disconnect

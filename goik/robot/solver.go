@@ -23,6 +23,9 @@ import (
 // the coxa, femur and tibia angle that results in the end effector moving to the effectorTarget coordinate
 // If a solution can not be found, the function returns an error.
 func SolveEffectorIK(leg *Leg, effectorTarget Coordinate, debugChannel chan string) (ServoAngles, error) {
+	if leg.FixedCoxa {
+		return solveFixedCoxaIK(leg, effectorTarget)
+	}
 	if !leg.Twists.IsZero() {
 		return solveTwistedIK(leg, effectorTarget)
 	}
@@ -83,4 +86,20 @@ func solveTwistedIK(leg *Leg, target Coordinate) (ServoAngles, error) {
 		return leg.ServoAngles, err
 	}
 	return ServoAngles{Coxa: wrapDegrees(q[0] / toRadians), Femur: wrapDegrees(q[1] / toRadians), Tibia: wrapDegrees(q[2] / toRadians)}, nil
+}
+
+// Largest distance (mm) between where a two joint leg's foot should be and where it can be. A two joint leg moves in
+// one plane, so a foot that should move sideways (a segment of a segmented body turning) slips a little instead
+const MAX_FOOT_SLIP = 15.0
+
+// solveFixedCoxaIK solves a two joint leg (femur and tibia) numerically, with the coxa held at its rest angle. The
+// foot goes as close to the target as the leg's plane allows
+func solveFixedCoxaIK(leg *Leg, target Coordinate) (ServoAngles, error) {
+	const toRadians = math.Pi / 180
+	seed := [3]float64{leg.ServoAngles.Coxa * toRadians, leg.ServoAngles.Femur * toRadians, leg.ServoAngles.Tibia * toRadians}
+	q, err := leg.model.solveWith(vec3{target.X, target.Y, target.Z}, seed, [3]bool{true, false, false}, MAX_FOOT_SLIP)
+	if err != nil {
+		return leg.ServoAngles, err
+	}
+	return ServoAngles{Coxa: leg.ServoAngles.Coxa, Femur: wrapDegrees(q[1] / toRadians), Tibia: wrapDegrees(q[2] / toRadians)}, nil
 }

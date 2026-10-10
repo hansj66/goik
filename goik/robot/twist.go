@@ -190,6 +190,12 @@ const (
 // solve returns the joint angles (radians) that put the foot on target, starting from seed. It fails if the
 // target is out of reach.
 func (m *legModel) solve(target vec3, seed [3]float64) ([3]float64, error) {
+	return m.solveWith(target, seed, [3]bool{}, 10*IK_TOLERANCE)
+}
+
+// solveWith is solve with some joints held at their seed angles. With a joint held, the foot may not be able to
+// reach the target at all: it then ends as close to it as it can get, and that may be up to maxMiss mm off.
+func (m *legModel) solveWith(target vec3, seed [3]float64, held [3]bool, maxMiss float64) ([3]float64, error) {
 	q := seed
 	for i := 0; i < IK_MAX_ITERATIONS; i++ {
 		joints, axes := m.forward(q)
@@ -198,9 +204,12 @@ func (m *legModel) solve(target vec3, seed [3]float64) ([3]float64, error) {
 			return q, nil
 		}
 
-		// Jacobian: column j is how the foot moves when joint j turns (axis x lever arm)
+		// Jacobian: column j is how the foot moves when joint j turns (axis x lever arm). A held joint doesn't
 		var J mat3
 		for j := 0; j < 3; j++ {
+			if held[j] {
+				continue
+			}
 			c := axes[j].cross(joints[3].sub(joints[j]))
 			J[0][j], J[1][j], J[2][j] = c[0], c[1], c[2]
 		}
@@ -231,10 +240,14 @@ func (m *legModel) solve(target vec3, seed [3]float64) ([3]float64, error) {
 		for j := range q {
 			q[j] += dq[j]
 		}
+		// Converged as close as it gets (with held joints the target may be out of reach)
+		if largest < 1e-10 {
+			break
+		}
 	}
 
 	joints, _ := m.forward(q)
-	if d := target.sub(joints[3]).length(); d > 10*IK_TOLERANCE {
+	if d := target.sub(joints[3]).length(); d > maxMiss {
 		return q, fmt.Errorf("[IK Solver] ERROR: Unable to find a solution. The foot gets no closer than %.2f mm to the target", d)
 	}
 	return q, nil

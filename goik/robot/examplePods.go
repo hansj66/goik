@@ -14,6 +14,8 @@
 
 package robot
 
+import "math"
+
 // Example pod with 6 legs. Uneven separation between legs
 func NewExampleHexapod0() *BodyDefinition {
 	gait, _ := NewHexapodGait(TRIPOD)
@@ -246,4 +248,62 @@ func NewExampleInsect() *BodyDefinition {
 		panic(err)
 	}
 	return b
+}
+
+// Example centipede: 16 segments, each with a pair of two joint legs (femur and tibia, the coxa fixed) that swing
+// forwards and backwards. The leg planes lean outwards (femur twist), so the feet splay. The segments are joined by
+// yaw joints and follow the head along its path, and it walks with the metachronal gait.
+func NewExampleCentipede() *BodyDefinition {
+	const (
+		segments = 16
+		spacing  = 30.0
+		height   = 35.0 // body above the ground
+		lean     = 35.0 // femur twist: how far the leg planes lean outwards
+	)
+	b := &BodyDefinition{
+		NumLegs: 2 * segments,
+		Body:    &SegmentedBody{Count: segments, Spacing: spacing, Length: 26, Width: 22, MaxJointAngle: 25},
+	}
+	leg := SegmentLengths{Coxa: 0, Femur: 32, Tibia: 48}
+	for k := 0; k < segments; k++ {
+		for side, x := range []float64{11, -11} {
+			twists := JointTwists{Femur: lean}
+			if side == 1 {
+				twists = twists.Mirrored()
+			}
+			mount := Coordinate{X: x}
+			b.CoxaCoordinates = append(b.CoxaCoordinates, mount)
+			// Pointing forwards: the femur and tibia swing in a fore and aft plane
+			b.CoxaAngles = append(b.CoxaAngles, 90)
+			b.Segments = append(b.Segments, leg)
+			b.Twists = append(b.Twists, twists)
+			b.LegSegments = append(b.LegSegments, k)
+			b.FixedCoxa = append(b.FixedCoxa, true)
+			b.RestAngles = append(b.RestAngles, standingAngles(mount, 90, leg, twists, height))
+		}
+	}
+	gait, err := NewGaitFor(b, METACHRONAL)
+	if err != nil {
+		panic(err)
+	}
+	b.Gait = gait
+	return b
+}
+
+// standingAngles returns the femur and tibia angles that put a two joint leg's foot height mm below the body, straight
+// down in the leg's plane, with the knee forwards
+func standingAngles(mount Coordinate, mountAngle float64, segments SegmentLengths, twists JointTwists, height float64) ServoAngles {
+	m := newLegModel(mount, mountAngle, segments, twists)
+	seed := [3]float64{0, 60 * math.Pi / 180, 60 * math.Pi / 180}
+	joints, axes := m.forward(seed)
+	// Straight down, within the plane the femur turns in
+	down := vec3{0, 0, 1}
+	down = down.sub(axes[1].scale(down.dot(axes[1])))
+	down = down.scale(1 / down.length())
+	target := joints[1].add(down.scale(height / down[2]))
+	q, err := m.solveWith(target, seed, [3]bool{true, false, false}, IK_TOLERANCE)
+	if err != nil {
+		panic(err)
+	}
+	return ServoAngles{Femur: q[1] * 180 / math.Pi, Tibia: q[2] * 180 / math.Pi}
 }

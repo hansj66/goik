@@ -88,6 +88,9 @@ func rotateZ(c Coordinate, a float64) Coordinate {
 
 // SetBodyPose sets the body pose the engine will move towards
 func (e *GaitEngine) SetBodyPose(b BodyPose) error {
+	if e.chain != nil && !b.IsZero() {
+		return fmt.Errorf("a segmented body can't change its pose (yet)")
+	}
 	for _, a := range []float64{b.Pitch, b.Roll, b.Yaw} {
 		if math.Abs(a) > MAX_POSE_ANGLE {
 			return fmt.Errorf("body rotation is limited to +/- %2.0f degrees", MAX_POSE_ANGLE)

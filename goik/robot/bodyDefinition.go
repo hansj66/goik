@@ -41,6 +41,13 @@ type BodyDefinition struct {
 	RestAngles []ServoAngles `json:"Angles"`
 	// Twists of the legs' joint axes (see twist.go). Nil (or shorter than NumLegs): untwisted legs
 	Twists []JointTwists `json:"Twists,omitempty"`
+	// A body made of segments (see segments.go). Nil: a one piece body
+	Body *SegmentedBody `json:"Body,omitempty"`
+	// The segment each leg is mounted on (segmented bodies only). The leg's CoxaCoordinates and CoxaAngles are in
+	// that segment's frame
+	LegSegments []int `json:"LegSegments,omitempty"`
+	// Legs with a fixed coxa: two joints (femur and tibia), so the leg moves in one plane. Nil: all legs have three
+	FixedCoxa []bool `json:"FixedCoxa,omitempty"`
 	// Maps joints to physical servos. Nil means the default mapping (see ServoMapping())
 	Servos *ServoMapping `json:"Servos,omitempty"`
 	// The design the geometry above was built from (see podDesign.go). Nil for pods without a design
@@ -55,6 +62,24 @@ func (b *BodyDefinition) LegTwists(leg int) JointTwists {
 		return b.Twists[leg]
 	}
 	return JointTwists{}
+}
+
+// LegSegment returns the segment a leg is mounted on (0 for one piece bodies)
+func (b *BodyDefinition) LegSegment(leg int) int {
+	if leg < len(b.LegSegments) {
+		return b.LegSegments[leg]
+	}
+	return 0
+}
+
+// HasFixedCoxa returns true if a leg has two joints (femur and tibia) and a fixed coxa
+func (b *BodyDefinition) HasFixedCoxa(leg int) bool {
+	return leg < len(b.FixedCoxa) && b.FixedCoxa[leg]
+}
+
+// IsSegmented returns true for a body made of segments
+func (b *BodyDefinition) IsSegmented() bool {
+	return b.Body != nil
 }
 
 // HasTwists returns true if any leg has a twisted joint
@@ -115,6 +140,15 @@ func (b *BodyDefinition) Load(filename string) (*BodyDefinition, error) {
 	if definition.Servos != nil {
 		if err := definition.Servos.Validate(definition.NumLegs); err != nil {
 			return nil, fmt.Errorf("%s: %w", filename, err)
+		}
+	}
+
+	if definition.Body != nil {
+		if err := definition.Body.Validate(); err != nil {
+			return nil, fmt.Errorf("%s: %w", filename, err)
+		}
+		if len(definition.LegSegments) != definition.NumLegs {
+			return nil, fmt.Errorf("%s: a segmented body needs a segment for each leg", filename)
 		}
 	}
 

@@ -31,15 +31,17 @@ package robot
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
 type GaitType int
 
 const (
-	TRIPOD GaitType = 0
-	WAVE   GaitType = 1
-	RIPPLE GaitType = 2
+	TRIPOD      GaitType = 0
+	WAVE        GaitType = 1
+	RIPPLE      GaitType = 2
+	METACHRONAL GaitType = 3
 )
 
 type GaitPattern [][]int
@@ -149,8 +151,10 @@ func ParseGaitType(name string) (GaitType, error) {
 		return RIPPLE, nil
 	case "wave":
 		return WAVE, nil
+	case "metachronal":
+		return METACHRONAL, nil
 	}
-	return TRIPOD, fmt.Errorf("unknown gait '%s' (tripod, ripple or wave)", name)
+	return TRIPOD, fmt.Errorf("unknown gait '%s' (tripod, ripple, wave or metachronal)", name)
 }
 
 func NewGait(NumLegs int, GaitType GaitType) (*Gait, error) {
@@ -164,7 +168,88 @@ func NewGait(NumLegs int, GaitType GaitType) (*Gait, error) {
 		return NewHeptapodGait(GaitType)
 	}
 
+	if GaitType == METACHRONAL {
+		return nil, fmt.Errorf("the metachronal gait depends on where the legs are on the body (see NewGaitFor)")
+	}
 	return newGeneratedGait(NumLegs, GaitType)
+}
+
+// NewGaitFor creates a gait for a pod. The metachronal gait depends on where the legs are; a segmented body only
+// walks with the metachronal gait (the other gaits assume the legs are numbered in order around the body)
+func NewGaitFor(b *BodyDefinition, gaitType GaitType) (*Gait, error) {
+	if gaitType == METACHRONAL {
+		return newMetachronalGait(b)
+	}
+	if b.IsSegmented() {
+		return nil, fmt.Errorf("a segmented body walks with the metachronal gait")
+	}
+	return NewGait(b.NumLegs, gaitType)
+}
+
+// Number of columns of the metachronal gait's pattern for a segmented body: the wave reaches the same phase again
+// this many segments further back
+const METACHRONAL_WAVELENGTH = 8
+
+// Fraction of the gait cycle a leg spends on the ground in the metachronal gait
+const METACHRONAL_DUTY_FACTOR = 0.75
+
+// newMetachronalGait creates a metachronal gait: a wave of steps that runs along the body from the head to the tail
+// (as in centipedes), with the legs on the left and right half a cycle apart. A leg's place in the wave is its
+// segment (segmented bodies) or its rank along its side of the body, front first (one piece bodies)
+func newMetachronalGait(b *BodyDefinition) (*Gait, error) {
+	if b.NumLegs < 3 {
+		return nil, fmt.Errorf("a pod needs at least 3 legs to walk (this one has %d)", b.NumLegs)
+	}
+	rank := make([]int, b.NumLegs)
+	side := make([]int, b.NumLegs)
+	for l := range rank {
+		if b.CoxaCoordinates[l].X < 0 {
+			side[l] = 1
+		}
+	}
+	var columns int
+	if b.IsSegmented() {
+		for l := range rank {
+			rank[l] = b.LegSegment(l)
+		}
+		columns = METACHRONAL_WAVELENGTH
+	} else {
+		// Front (+Y) first on each side
+		perSide := 0
+		for l := range rank {
+			for o := range rank {
+				if side[o] == side[l] && (b.CoxaCoordinates[o].Y > b.CoxaCoordinates[l].Y || (b.CoxaCoordinates[o].Y == b.CoxaCoordinates[l].Y && o < l)) {
+					rank[l]++
+				}
+			}
+			if rank[l]+1 > perSide {
+				perSide = rank[l] + 1
+			}
+		}
+		// The wave spans the body, so each step of rank moves the phase on by 1 / perSide
+		columns = 2 * perSide
+		for l := range rank {
+			rank[l] *= 2
+		}
+	}
+
+	swing := int(math.Round(float64(columns) * (1 - METACHRONAL_DUTY_FACTOR)))
+	if swing < 1 {
+		swing = 1
+	}
+	p := make(GaitPattern, b.NumLegs)
+	for l := range p {
+		p[l] = make([]int, columns) // 1 == swing phase, 0 == stance phase
+		start := rank[l] + side[l]*columns/2
+		for c := 0; c < swing; c++ {
+			p[l][(start+c)%columns] = 1
+		}
+	}
+	return &Gait{
+		Pattern:             &p,
+		Name:                "Metachronal gait",
+		NumIndicesInPattern: columns,
+	}, nil
 }
 
 // newGeneratedGait creates a gait pattern for 3 or more legs, numbered in order around the body

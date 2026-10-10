@@ -92,6 +92,9 @@ type CadAssembly struct {
 
 // NewCadAssembly describes the pod in its rest pose
 func NewCadAssembly(b *BodyDefinition, name string) (*CadAssembly, error) {
+	if b.IsSegmented() {
+		return nil, fmt.Errorf("the CAD export doesn't support segmented bodies yet")
+	}
 	// The printable brackets (cad/brackets.py) follow femur and tibia twists. A coxa twist would tilt the coxa
 	// servos on the body plates
 	for l := 0; l < b.NumLegs; l++ {

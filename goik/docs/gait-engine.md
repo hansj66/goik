@@ -22,6 +22,7 @@ mid-stride, without the feet jumping.
 | Stopping | `halt` sets the velocity to 0. The swing targets become the neutral positions, so the pod steps back into its neutral stance and goes idle |
 | IK failure | A leg that can't reach its target keeps its last valid pose, and the error is counted (`engine`) |
 | Body pose | Pitch, roll, yaw, shift and height of the body relative to the feet ([robot/bodyPose.go](../robot/bodyPose.go)). The feet stay in the ground frame and are transformed into the body frame before IK. A pose that would put a foot out of reach, or the body within 10 mm of the ground, stops at the last valid pose. Shifting the body moves the centre of gravity |
+| Segmented bodies | Each foot is kept in its own segment's frame, and a grounded foot moves with its segment, which follows the head along its path. See [centipede.md](centipede.md) |
 | Cycles and odometry | The engine counts gait cycles (`walk ... cycles <n>`) and integrates the body's motion into a world position and heading (`engine`, and the ground grid and path in the views) |
 
 The simulator advances the engine 20 ms per update. Scripts run in the same robot time, so a script looks the same

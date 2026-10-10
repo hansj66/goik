@@ -277,12 +277,12 @@ func (d *PodDesign) BodyDefinition(previous *BodyDefinition) (*BodyDefinition, e
 	}
 	if previous != nil {
 		if t, err := previous.Gait.Type(); err == nil {
-			if _, err := NewGait(n, t); err == nil {
+			if _, err := NewGaitFor(b, t); err == nil {
 				gaitType = t
 			}
 		}
 	}
-	if b.Gait, err = NewGait(n, gaitType); err != nil {
+	if b.Gait, err = NewGaitFor(b, gaitType); err != nil {
 		return nil, err
 	}
 

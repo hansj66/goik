@@ -42,6 +42,7 @@ which is scaled to fill the window. A wider window shows more of the ground arou
 | 6 | Hexapod designed around real AX-12A servos |
 | 7 | Hexapod designed around real STS3215 servos |
 | 8 | Insect like hexapod with twisted joints (see [Twisted joints](designing-a-pod.md#twisted-joints)) |
+| 9 | Centipede: 16 segments with a pair of two joint legs each, walking with the metachronal gait (see [centipede.md](centipede.md)) |
 
 Use pod 6 or 7 for the [CAD export](cad-export.md): the older pods are too small for real servos.
 
@@ -55,7 +56,7 @@ A step by step guide with examples: [designing-a-pod.md](designing-a-pod.md).
 
 | Command | Does |
 |---|---|
-| `reset <0-8>` | Load an example pod |
+| `reset <0-9>` | Load an example pod |
 | `save <file>` / `load <file>` | Save / load the pod definition |
 | `set_coxa_length <ALL \| leg> <mm>` | Coxa length |
 | `set_femur_length <ALL \| leg> <mm>` | Femur length |
@@ -84,7 +85,7 @@ See [gait-engine.md](gait-engine.md) for how walking works.
 | `walk <x> <y> <yaw> for <s>` | Walk for a number of seconds, then halt |
 | `walk <x> <y> <yaw> cycles <n>` | Walk for a number of gait cycles, then halt |
 | `halt` | Slow down and step back into the neutral stance |
-| `gait <tripod \| ripple \| wave>` | Select the gait. Blends into the new gait while walking |
+| `gait <tripod \| ripple \| wave \| metachronal>` | Select the gait. Blends into the new gait while walking. Metachronal: a wave of steps from the front to the back, the two sides half a cycle apart |
 | `swing_time <seconds>` | Duration of a leg swing (default 0.4). The cycle time follows from it |
 | `step_height <mm>` | Height of the swing arc |
 | `speed <1-10>` | Simulation speed. At 10 (the default) the simulation runs at about real time; lower values are slow motion |
@@ -118,6 +119,9 @@ The sticks have a 25% dead zone and the triggers 15%, so a stick that rests slig
 `gamepad` shows the raw stick, trigger and button values, to check a pad. A response curve gives fine control near
 the centre. Pitch and roll follow
 the stick and triggers and spring back to level when they are released; the gait engine ramps the pose smoothly.
+
+A stick or trigger has to be out of its dead zone for a moment (50 ms) before the gamepad takes over, so a resting
+stick that twitches doesn't interrupt a `walk` command or a script. Buttons act at once.
 
 Using a stick, trigger or button takes over from a running script (it is stopped). When everything is released, the pod
 stops walking, levels its pitch and roll, and the shell's commands work as before. If the gamepad is disconnected while

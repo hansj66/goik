@@ -211,6 +211,10 @@ Example layout of a hexapod
 
 ![xyview](../pictures/xyview.png)
 
+The metachronal gait (`gait metachronal`) is generated from where the legs are: a wave of steps runs along each side
+from the front to the back, and the two sides are half a cycle apart. For segmented bodies a leg's place in the wave
+is its segment ([centipede.md](centipede.md)).
+
 The patterns below are for a hexapod. Pentapods and heptapods have hand written wave gait patterns, and other numbers
 of legs get generated ones (wave gait, tripod gait for an even number of legs, ripple gait for a multiple of 3, see
 [robot/gaits.go](../robot/gaits.go)). All of them assume that the legs are numbered in order around the body.

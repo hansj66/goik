@@ -68,7 +68,7 @@ func TestGamepadPoseAndButtons(t *testing.T) {
 	state := pad()
 	state.Axes[control.RightStickY] = 1
 	state.Axes[control.RightTrigger] = 1
-	s.tick(state, 1)
+	s.tick(state, control.ENGAGE_UPDATES)
 	if p := s.Pod.Engine.TargetBodyPose(); p.Pitch != 15 || p.Roll != -15 {
 		t.Errorf("pose %s, want pitch 15 and roll -15", p.String())
 	}
@@ -110,7 +110,7 @@ func TestGamepadStopsAScript(t *testing.T) {
 	state := pad()
 	state.Axes[control.LeftStickX] = 1
 	s.tick(pad(), 1)
-	s.tick(state, 1)
+	s.tick(state, control.ENGAGE_UPDATES)
 	if !s.Script.Done() {
 		t.Errorf("the script is still running")
 	}

@@ -146,7 +146,7 @@ func (s *Shell) executeResetCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
 	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('reset <0-8>'): %+v", args)
+		return fmt.Errorf("syntax error ('reset <0-9>'): %+v", args)
 	}
 
 	s.stopScript()
@@ -169,6 +169,8 @@ func (s *Shell) executeResetCmd(args []string) error {
 		s.Pod = robot.NewPod(robot.NewExampleHexapodSTS3215())
 	} else if args[1] == "8" {
 		s.Pod = robot.NewPod(robot.NewExampleInsect())
+	} else if args[1] == "9" {
+		s.Pod = robot.NewPod(robot.NewExampleCentipede())
 	} else {
 		return fmt.Errorf("Unknown example preset")
 	}
@@ -200,7 +202,7 @@ func (s *Shell) executeGaitCmd(args []string) error {
 	s.outputCh <- fmt.Sprintf("%+v", args)
 
 	if len(args) != 2 {
-		return fmt.Errorf("syntax error ('gait <tripod|ripple|wave>'): %+v", args)
+		return fmt.Errorf("syntax error ('gait <tripod|ripple|wave|metachronal>'): %+v", args)
 	}
 
 	// The gait engine blends into the new gait while walking
@@ -212,7 +214,7 @@ func (s *Shell) executeGaitCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	gait, err := robot.NewGait(s.Pod.BodyDefinition.NumLegs, gaitType)
+	gait, err := robot.NewGaitFor(s.Pod.BodyDefinition, gaitType)
 	if err != nil {
 		return err
 	}

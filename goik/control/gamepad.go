@@ -153,7 +153,14 @@ type Controller struct {
 	engaged  bool
 	// B was pressed: walking stops until the sticks are released
 	halted bool
+	// Number of updates in a row with a stick or trigger outside its dead zone
+	deflected int
 }
+
+// A stick or trigger must be outside its dead zone for this many updates in a row (50 ms at 60 updates per second)
+// before the controller takes over, so a twitch of a resting stick doesn't interrupt a shell command or script.
+// Buttons act at once
+const ENGAGE_UPDATES = 3
 
 // NewController returns a controller with the default settings
 func NewController() *Controller {
@@ -305,11 +312,18 @@ func (c *Controller) Update(s GamepadState) Command {
 		c.halted = false
 	}
 
-	active := !centred
-	for _, down := range s.Buttons {
-		active = active || down
+	if centred {
+		c.deflected = 0
+	} else {
+		c.deflected++
 	}
-	if active && !c.engaged {
+	active := !centred
+	buttonDown := false
+	for _, down := range s.Buttons {
+		buttonDown = buttonDown || down
+	}
+	active = active || buttonDown
+	if !c.engaged && (buttonDown || c.deflected >= ENGAGE_UPDATES) {
 		c.engaged = true
 		cmd.TakeOver = true
 	}

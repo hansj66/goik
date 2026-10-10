@@ -19,6 +19,7 @@ It has so far been tested on Mac and Windows
 | [Using the simulator](./goik/docs/simulator.md) | The views, the example pods and all shell commands |
 | [Designing a pod](./goik/docs/designing-a-pod.md) | Body, legs, segment lengths, joint angles and stance, with examples |
 | [Pod designer](./goik/docs/pod-designer.md) | Plan for the interactive pod designer |
+| [Centipede](./goik/docs/centipede.md) | Segmented bodies: the centipede, its two joint legs and the metachronal gait |
 | [The gait engine](./goik/docs/gait-engine.md) | How walking, gait transitions and the body pose work |
 | [Motion scripts](./goik/docs/scripts.md) | Chaining walks, turns, gait changes and poses in a script |
 | [Servos](./goik/docs/servos.md) | Servo mapping, servo models and Dynamixel hardware |
@@ -73,7 +74,7 @@ Installing make:
 
 GOIK will open a command shell and a graphical XZ/XY and isometric view along with a visualization of the current gait pattern
 
-Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 9 different preloaded models (`reset 0` to `reset 8`, the last one an insect with twisted joints) that can be played with to get a feel for the simulator. See [Using the simulator](./goik/docs/simulator.md) for all commands, and [Designing a pod](./goik/docs/designing-a-pod.md) for designing your own pod (body, legs and stance), with examples.
+Type `help` in the command shell to get a list of commands, or `help <section>` (design, walk, pose, scripts, servos) for a part of it. There are 10 different preloaded models (`reset 0` to `reset 9`: an insect with twisted joints is 8, a centipede 9) that can be played with to get a feel for the simulator. See [Using the simulator](./goik/docs/simulator.md) for all commands, and [Designing a pod](./goik/docs/designing-a-pod.md) for designing your own pod (body, legs and stance), with examples.
 
 ### Example session
 

@@ -158,6 +158,9 @@ type EngineLeg struct {
 	swingDuration float64
 }
 
+// The default step height of a segmented body, as a fraction of the body's height above the ground
+const SEGMENTED_STEP_HEIGHT = 0.4
+
 // GaitEngine generates continuous leg motion from a body velocity and a gait,
 // and allows both to be changed at any time.
 type GaitEngine struct {
@@ -207,6 +210,10 @@ type GaitEngine struct {
 	odometryHeading float64
 	// Landing targets from the last tick
 	targets []Coordinate
+	// The segments of a segmented body (nil for one piece bodies), and how each segment moved in the last tick
+	// (in its own frame, per second)
+	chain          *segmentChain
+	segmentMotions []Twist
 
 	pose         BodyPose
 	previousPose BodyPose
@@ -249,6 +256,16 @@ func NewGaitEngine(p *Pod) (*GaitEngine, error) {
 		e.Legs[i].Phase = gait.Offsets[i]
 		e.Legs[i].liftPending = gait.Offsets[i] >= gait.DutyFactor
 	}
+	if body := p.BodyDefinition.Body; body != nil {
+		e.chain = newSegmentChain(*body, SegmentPose{})
+		e.segmentMotions = make([]Twist, body.Count)
+		// The legs of a segmented body are short: lift the feet in proportion to the body's height
+		depth := 0.0
+		for _, l := range p.Legs {
+			depth += (l.NeutralEffectorCoordinate.Z - l.Joints[COXA_ORIGIN_INDEX].Z) / float64(len(p.Legs))
+		}
+		e.StepHeight = math.Min(Z_LIFT, SEGMENTED_STEP_HEIGHT*depth)
+	}
 
 	e.Reach = p.ReachRadius(e.StepHeight)
 	e.MaxStride = 2 * STRIDE_REACH_MARGIN * e.Reach
@@ -264,8 +281,12 @@ func (e *GaitEngine) CycleTime() float64 {
 	return e.SwingTime / (1 - e.dutyFactor)
 }
 
-// SetTwist sets the body velocity the engine will accelerate towards
+// SetTwist sets the body velocity the engine will accelerate towards. A segmented body can't walk sideways: its
+// segments follow the head along its path
 func (e *GaitEngine) SetTwist(t Twist) {
+	if e.chain != nil {
+		t.X = 0
+	}
 	e.target = t
 }
 
@@ -283,14 +304,14 @@ func (e *GaitEngine) SetGait(g *PhaseGait) error {
 	return nil
 }
 
-// SetGaitByName starts a smooth transition to a gait by name (tripod, ripple or wave)
+// SetGaitByName starts a smooth transition to a gait by name (tripod, ripple, wave or metachronal)
 // and makes it the pod's current gait
 func (e *GaitEngine) SetGaitByName(name string) error {
 	gaitType, err := ParseGaitType(name)
 	if err != nil {
 		return err
 	}
-	gait, err := NewGait(len(e.Legs), gaitType)
+	gait, err := NewGaitFor(e.pod.BodyDefinition, gaitType)
 	if err != nil {
 		return err
 	}
@@ -360,6 +381,9 @@ func (e *GaitEngine) Tick(dt float64) {
 	// to keep the feet reachable, but that should not move the target of a foot that is about to land
 	commanded := e.limitStride(e.current)
 	twist := e.limitReach(commanded, dt)
+	if e.chain != nil {
+		commanded, twist = e.limitJointBend(commanded, dt), e.limitJointBend(twist, dt)
+	}
 	posing := e.rampPose(dt)
 
 	if commanded.IsZero() && e.isSettled() {
@@ -374,6 +398,7 @@ func (e *GaitEngine) Tick(dt float64) {
 	e.idle = false
 	e.applied = twist
 	e.updateOdometry(twist, dt)
+	moves := e.moveSegments(dt)
 
 	cycles := dt / e.CycleTime()
 	e.cycles += cycles
@@ -384,10 +409,13 @@ func (e *GaitEngine) Tick(dt float64) {
 	for i := range e.Legs {
 		l := &e.Legs[i]
 		e.advancePhase(i, cycles)
-		e.targets[i] = e.landingTarget(i, commanded, stanceTime)
+		e.targets[i] = e.landingTarget(i, e.legMotion(i, commanded), stanceTime)
 
 		if l.Swinging {
 			e.updateSwing(l, e.targets[i], dt)
+		} else if moves != nil {
+			// Grounded: the foot stays where it is in the world, while its segment moves
+			l.Foot = moves[e.pod.BodyDefinition.LegSegment(i)].ToParent(l.Foot)
 		} else {
 			l.Foot = moveWithGround(l.Foot, twist, dt)
 		}
@@ -401,6 +429,84 @@ func (e *GaitEngine) Tick(dt float64) {
 		}
 	}
 	e.solveAll()
+}
+
+// moveSegments moves the segments of a segmented body after the head has moved (the odometry). It returns, per
+// segment, the segment's previous pose seen from its new pose, to move grounded feet with. Nil for one piece bodies
+func (e *GaitEngine) moveSegments(dt float64) []SegmentPose {
+	if e.chain == nil {
+		return nil
+	}
+	old := append([]SegmentPose(nil), e.chain.poses...)
+	e.chain.moveHead(SegmentPose{X: e.odometryX, Y: e.odometryY, Heading: e.odometryHeading})
+	moves := make([]SegmentPose, len(old))
+	for k := range old {
+		moves[k] = e.chain.poses[k].Relative(old[k])
+		motion := old[k].Relative(e.chain.poses[k])
+		e.segmentMotions[k] = Twist{X: motion.X / dt, Y: motion.Y / dt, Yaw: motion.Heading * 180 / math.Pi / dt}
+	}
+	return moves
+}
+
+// legMotion returns the velocity of the leg's body part: the head's (commanded) velocity, or how the leg's segment
+// moved in the last tick
+func (e *GaitEngine) legMotion(legIndex int, commanded Twist) Twist {
+	if e.chain == nil {
+		return commanded
+	}
+	segment := e.pod.BodyDefinition.LegSegment(legIndex)
+	if segment == 0 {
+		return commanded
+	}
+	return e.segmentMotions[segment]
+}
+
+// limitJointBend stops the head turning further when the joint behind it is at its largest angle (a segmented body
+// can only turn as sharply as its joints allow)
+func (e *GaitEngine) limitJointBend(t Twist, dt float64) Twist {
+	if len(e.chain.poses) < 2 || t.Yaw == 0 {
+		return t
+	}
+	max := e.chain.body.MaxJointAngle * math.Pi / 180
+	bend := wrapRadians(e.odometryHeading + t.Yaw*math.Pi/180*dt - e.chain.poses[1].Heading)
+	if math.Abs(bend) > max && bend*t.Yaw > 0 {
+		t.Yaw = 0
+	}
+	return t
+}
+
+// SegmentPoses returns the poses of the segments of a segmented body in the ground reference frame (the head's
+// frame). Nil for one piece bodies
+func (e *GaitEngine) SegmentPoses() []SegmentPose {
+	if e.chain == nil {
+		return nil
+	}
+	poses := make([]SegmentPose, len(e.chain.poses))
+	for k, p := range e.chain.poses {
+		poses[k] = e.chain.head.Relative(p)
+	}
+	return poses
+}
+
+// SegmentJoints returns the positions of the joints between the segments in the ground reference frame. Nil for
+// one piece bodies
+func (e *GaitEngine) SegmentJoints() []Coordinate {
+	if e.chain == nil {
+		return nil
+	}
+	joints := e.chain.joints()
+	for k, j := range joints {
+		joints[k] = e.chain.head.FromParent(j)
+	}
+	return joints
+}
+
+// JointAngles returns the angles (degrees) of the joints between the segments of a segmented body
+func (e *GaitEngine) JointAngles() []float64 {
+	if e.chain == nil {
+		return nil
+	}
+	return e.chain.jointAngles()
 }
 
 // Cycles returns the number of gait cycles completed since the engine was created
@@ -465,6 +571,10 @@ func (e *GaitEngine) advancePhase(legIndex int, cycles float64) {
 
 // canLift returns true if the pod stays statically stable without the support of the leg
 func (e *GaitEngine) canLift(legIndex int) bool {
+	// A segmented body has many legs on the ground, and each segment's feet are in its own frame
+	if e.chain != nil {
+		return true
+	}
 	cog := e.centreOfGravity()
 	var feet []Coordinate
 	for i, l := range e.Legs {

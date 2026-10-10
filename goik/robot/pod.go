@@ -172,6 +172,7 @@ func (p *Pod) UpdatePodStructure() {
 			p.BodyDefinition.Segments[l],
 			twists,
 			p.debugChannel)
+		p.Legs[l].FixedCoxa = p.BodyDefinition.HasFixedCoxa(l)
 	}
 	p.Engine = nil
 }
@@ -207,13 +208,59 @@ func (p *Pod) GroundJoints() [][NUM_JOINTS]Coordinate {
 	joints := make([][NUM_JOINTS]Coordinate, len(p.Legs))
 	for l, leg := range p.Legs {
 		for j, c := range leg.Joints {
-			if p.Engine != nil {
-				c = p.Engine.ToGround(c)
-			}
-			joints[l][j] = c
+			joints[l][j] = p.LegToGround(l, c)
 		}
 	}
 	return joints
+}
+
+// LegToGround transforms a point in a leg's frame (the body's frame, or for a segmented body its segment's frame)
+// to the ground reference frame
+func (p *Pod) LegToGround(leg int, c Coordinate) Coordinate {
+	if p.BodyDefinition.IsSegmented() {
+		return p.SegmentPoses()[p.BodyDefinition.LegSegment(leg)].ToParent(c)
+	}
+	if p.Engine != nil {
+		return p.Engine.ToGround(c)
+	}
+	return c
+}
+
+// SegmentPoses returns the poses of a segmented body's segments in the ground reference frame (the head's frame).
+// Nil for one piece bodies
+func (p *Pod) SegmentPoses() []SegmentPose {
+	body := p.BodyDefinition.Body
+	if body == nil {
+		return nil
+	}
+	if p.Engine != nil {
+		return p.Engine.SegmentPoses()
+	}
+	return body.RestSegmentPoses()
+}
+
+// SegmentJoints returns the positions of the joints between a segmented body's segments in the ground reference
+// frame. Nil for one piece bodies
+func (p *Pod) SegmentJoints() []Coordinate {
+	body := p.BodyDefinition.Body
+	if body == nil {
+		return nil
+	}
+	if p.Engine != nil {
+		return p.Engine.SegmentJoints()
+	}
+	return body.RestJoints()
+}
+
+// ViewCentre returns the point (ground reference frame) the views centre on: the origin, or the middle of a
+// segmented body
+func (p *Pod) ViewCentre() Coordinate {
+	poses := p.SegmentPoses()
+	if len(poses) == 0 {
+		return Coordinate{}
+	}
+	first, last := poses[0], poses[len(poses)-1]
+	return Coordinate{X: (first.X + last.X) / 2, Y: (first.Y + last.Y) / 2}
 }
 
 // IsSwingPhase returns true if the leg with index == legIndex is currently in the swing phase
@@ -251,10 +298,18 @@ func (p *Pod) ReachRadius(lift float64) float64 {
 	for r := 5.0; r <= 200; r += 5 {
 		for _, l := range p.Legs {
 			n := l.NeutralEffectorCoordinate
-			for d := 0; d < directions; d++ {
-				a := 2 * math.Pi * float64(d) / directions
+			angles := make([]float64, directions)
+			for d := range angles {
+				angles[d] = 2 * math.Pi * float64(d) / directions
+			}
+			if l.FixedCoxa {
+				// A two joint leg only steps along its plane: forwards and backwards
+				a := (l.CoxaSeparationAngle + l.ServoAngles.Coxa) * math.Pi / 180
+				angles = []float64{a, a + math.Pi}
+			}
+			for _, a := range angles {
 				for _, z := range []float64{n.Z, n.Z - lift} {
-					if _, err := SolveEffectorIK(l, NewCoordinate(n.X+r*math.Cos(a), n.Y+r*math.Sin(a), z), p.debugChannel); err != nil {
+					if !l.reaches(NewCoordinate(n.X+r*math.Cos(a), n.Y+r*math.Sin(a), z), p.debugChannel) {
 						return reach
 					}
 				}
